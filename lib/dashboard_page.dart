@@ -4,8 +4,13 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:station_msloyalty/AppConfig.dart';
+import 'package:station_msloyalty/Helper/PumpBySaleReport.dart';
 import 'package:station_msloyalty/Helper/TextFieldDialog.dart';
+import 'package:station_msloyalty/Model/SaleDataModel.dart';
+import 'package:station_msloyalty/config.dart';
 import 'package:station_msloyalty/main.dart';
+import 'package:station_msloyalty/summary_view.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class DashboardPage extends StatefulWidget {
@@ -18,7 +23,7 @@ class DashboardPage extends StatefulWidget {
 class _DashboardPage extends State<DashboardPage> {
   // API Configurations
   // Windows Desktop တွင် local run ထားသော Node.js အတွက် localhost:3000 သုံးနိုင်သည်
-  final String apiUrl = "http://localhost:3000/api/sales/recent";
+  final String apiUrl = "${AppConfig.apiUrl}/api/sales/recent";
 
   final supabase = Supabase.instance.client;
 
@@ -73,8 +78,9 @@ class _DashboardPage extends State<DashboardPage> {
     _fetchInitialData(todayStart, todayEnd);
 
     // ၅ စက္ကန့်တစ်ခါ API Status ကို စစ်ဆေးရန်
-    _statusTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
-      _checkConnection();
+    _statusTimer = Timer.periodic(const Duration(seconds: 5), (timer) async {
+      await _checkConnection();
+      print("API Status: $_isApiOnline");
     });
   }
 
@@ -96,16 +102,14 @@ class _DashboardPage extends State<DashboardPage> {
   // API Connection အခြေအနေကို စစ်ဆေးခြင်း
   Future<void> _checkConnection() async {
     try {
-      final response = await http.get(Uri.parse(apiUrl)).timeout(const Duration(seconds: 3));
-      if (mounted) {
+      final response = await http.get(Uri.parse(apiUrl)).timeout(const Duration(seconds: 15));
+      if (response.statusCode == 200) {
         setState(() {
           _isApiOnline = response.statusCode == 200;
         });
       }
     } catch (e) {
-      if (mounted) {
-        setState(() => _isApiOnline = false);
-      }
+      setState(() => _isApiOnline = false);
     }
   }
 
@@ -119,7 +123,7 @@ class _DashboardPage extends State<DashboardPage> {
 
     // Node.js API Route (Search endpoint ကို သုံးထားပါသည်)
     final url = Uri.parse(
-      'http://localhost:3000/api/sales/search?startDate=$startStr&endDate=$endStr',
+      '${AppConfig.apiUrl}/api/sales/search?startDate=$startStr&endDate=$endStr',
     );
 
     try {
@@ -154,7 +158,7 @@ class _DashboardPage extends State<DashboardPage> {
     final String endStr = DateFormat('yyyy-MM-dd HH:mm:ss').format(end);
 
     final url = Uri.parse(
-      'http://localhost:3000/api/system-control/search?start=$startStr&end=$endStr',
+      '${AppConfig.apiUrl}/api/system-control/search?start=$startStr&end=$endStr',
     );
 
     try {
@@ -295,28 +299,16 @@ class _DashboardPage extends State<DashboardPage> {
                 //_buildSearchHeader(),
                 _buildDateSearchRow(), // Date Range Picker Button
                 //Summary Table ကို ခေါ်သုံးပါ ---
-                Expanded(
-                  flex: 1,
-                  child: Row(
-                    children: [
-                      Container(
-                        width:
-                            MediaQuery.of(context).size.width * 0.5 -
-                            20, // Screen width ရဲ့ 50% နဲ့ margin ထည့်ခြင်း
-                        child: _buildTypeSummaryTable(),
-                      ),
-                      Container(
-                        width:
-                            MediaQuery.of(context).size.width * 0.5 -
-                            20, // Screen width ရဲ့ 50% နဲ့ margin ထည့်ခြင်း
-                        child: _buildFuelSummaryTable(),
-                      ),
-                    ],
-                  ),
+                SummaryView(
+                  saleSummaryTable: _buildTypeSummaryTable(),
+                  fuelSummaryTable: _buildFuelSummaryTable(),
                 ),
                 // Header Information
                 _buildHeaderInfo(),
-                Expanded(child: _salesData.isEmpty ? _buildEmptyState() : _buildDataTable()),
+                Expanded(
+                  flex: 1,
+                  child: _salesData.isEmpty ? _buildEmptyState() : _buildDataTable(),
+                ),
               ],
             ),
     );
@@ -350,61 +342,16 @@ class _DashboardPage extends State<DashboardPage> {
       padding: const EdgeInsets.all(15),
       color: Colors.blueGrey.shade50,
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        crossAxisAlignment: CrossAxisAlignment.start,
-
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  SizedBox(width: 50, child: const Text("From ")),
-                  Text(":  "),
-                  Text(
-                    "${DateFormat('dd-MM-yyyy').format(_startDate)} ${_startTimeController.text}",
-                  ),
-                ],
-              ),
-              const SizedBox(width: 10),
-              Row(
-                children: [
-                  SizedBox(width: 50, child: const Text("To ")),
-                  Text(":  "),
-                  Text("${DateFormat('dd-MM-yyyy').format(_endDate)} ${_endTimeController.text}"),
-                ],
-              ),
-
-              Row(
-                children: [
-                  SizedBox(width: 50, child: Text("Record")),
-                  Text(":  "),
-                  Text("${_salesData.length}"),
-                ],
-              ),
-            ],
+          Text(
+            "စုစုပေါင်းငွေ: ${NumberFormat('#,###').format(_salesData.fold<num>(0, (num sum, item) => sum + (item['TotalPrice'] ?? 0)))} Ks",
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.green),
           ),
-          Column(
-            children: [
-              Text(
-                "စုစုပေါင်းငွေ: ${NumberFormat('#,###').format(_salesData.fold<num>(0, (num sum, item) => sum + (item['TotalPrice'] ?? 0)))} MMK",
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.green,
-                ),
-              ),
-
-              // UI တွင်ပြသရန်:
-              Text(
-                "Grand Total Liters: ${grandTotalLiter.toStringAsFixed(2)} L",
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.blue,
-                ),
-              ),
-            ],
+          // UI တွင်ပြသရန်:
+          Text(
+            "စုစုပေါင်းလီတာ: ${grandTotalLiter.toStringAsFixed(2)} Lit",
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.blue),
           ),
         ],
       ),
@@ -653,16 +600,6 @@ class _DashboardPage extends State<DashboardPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  const Icon(Icons.summarize, color: Colors.teal),
-                  const SizedBox(width: 10),
-                  const Text(
-                    "အရောင်းအမျိုးအစားအလိုက် အနှစ်ချုပ်",
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                ],
-              ),
               const Divider(height: 20),
               SizedBox(
                 width: double.infinity,
@@ -733,19 +670,6 @@ class _DashboardPage extends State<DashboardPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  const Icon(
-                    Icons.local_gas_station,
-                    color: Colors.orange,
-                  ), // ဆီဆိုင် icon ပြောင်းထားသည်
-                  const SizedBox(width: 10),
-                  const Text(
-                    "ဆီအမျိုးအစားအလိုက် အနှစ်ချုပ်",
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                ],
-              ),
               const Divider(height: 20),
               SizedBox(
                 width: double.infinity,
@@ -919,7 +843,7 @@ class _DashboardPage extends State<DashboardPage> {
           _dateTextField(_endDateController, "To Date"),
           _timeTextField(_endTimeController, "End Time"),
 
-          const Spacer(),
+          SizedBox(width: 20),
 
           // --- Search Button ---
           ElevatedButton(
@@ -936,10 +860,72 @@ class _DashboardPage extends State<DashboardPage> {
               _fetchSysControlByRange(start, end);
             },
             style: ElevatedButton.styleFrom(
+              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
               backgroundColor: Colors.teal,
               foregroundColor: Colors.white,
             ),
-            child: const Text("Search"),
+            child: Row(children: [Icon(Icons.search), SizedBox(width: 8), Text("Search")]),
+          ),
+
+          const Spacer(),
+          Row(
+            children: [
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue,
+                  foregroundColor: Colors.white,
+                ),
+                onPressed: () {
+                  // List<SaleData> salesList = _salesData.map((x) => SaleData.fromMap(x)).toList();
+                  exportSaleDataReport(
+                    _salesData.toList(),
+                    AppConfig.stationName,
+                    "${DateFormat('dd-MM-yyyy').format(_startDate)} ${_startTimeController.text}",
+                    "${DateFormat('dd-MM-yyyy').format(_endDate)} ${_endTimeController.text}",
+                  );
+                },
+                child: Row(
+                  children: [
+                    Icon(Icons.data_thresholding_rounded),
+                    SizedBox(width: 8),
+                    Text("Pump By Sale Report"),
+                  ],
+                ),
+              ),
+              SizedBox(width: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      SizedBox(width: 50, child: const Text("From ")),
+                      Text(":  "),
+                      Text(
+                        "${DateFormat('dd-MM-yyyy').format(_startDate)} ${_startTimeController.text}",
+                      ),
+                    ],
+                  ),
+                  const SizedBox(width: 10),
+                  Row(
+                    children: [
+                      SizedBox(width: 50, child: const Text("To ")),
+                      Text(":  "),
+                      Text(
+                        "${DateFormat('dd-MM-yyyy').format(_endDate)} ${_endTimeController.text}",
+                      ),
+                    ],
+                  ),
+
+                  Row(
+                    children: [
+                      SizedBox(width: 50, child: Text("Record")),
+                      Text(":  "),
+                      Text("${_salesData.length}"),
+                    ],
+                  ),
+                ],
+              ),
+            ],
           ),
         ],
       ),

@@ -37,6 +37,11 @@ dependencies:
   intl: ^0.18.1
   http:
   supabase_flutter: ^2.0.0
+  syncfusion_flutter_xlsio: ^32.2.3
+  path_provider:
+  open_file:
+  path:
+  ini:
 
 dev_dependencies:
   flutter_test:
