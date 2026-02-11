@@ -24,12 +24,15 @@ class _DashboardPage extends State<DashboardPage> {
   // API Configurations
   // Windows Desktop တွင် local run ထားသော Node.js အတွက် localhost:3000 သုံးနိုင်သည်
   final String apiUrl = "${AppConfig.apiUrl}/api/sales/recent";
+  final String apiEhoSendCount = "${AppConfig.apiUrl}/api/eho/send-count";
 
   final supabase = Supabase.instance.client;
 
   List<dynamic> _salesData = [];
   bool _isLoadingSales = false;
   bool _isApiOnline = false;
+  bool _isEhoUpdate = false;
+  int _ehoRemainingToSendCount = 0;
   Timer? _statusTimer;
   DateTimeRange? _selectedDateRange; // ရက်စွဲ နှစ်ခုအတွက်
   // Map<String, dynamic>? _sysControl;
@@ -80,7 +83,9 @@ class _DashboardPage extends State<DashboardPage> {
     // ၅ စက္ကန့်တစ်ခါ API Status ကို စစ်ဆေးရန်
     _statusTimer = Timer.periodic(const Duration(seconds: 5), (timer) async {
       await _checkConnection();
+      await _ehoRemainingToSend();
       print("API Status: $_isApiOnline");
+      print("EHO Remaining to send: $_ehoRemainingToSendCount");
     });
   }
 
@@ -110,6 +115,30 @@ class _DashboardPage extends State<DashboardPage> {
       }
     } catch (e) {
       setState(() => _isApiOnline = false);
+    }
+  }
+
+  // EHO Reaming to send count
+  // API Connection အခြေအနေကို စစ်ဆေးခြင်း
+  Future<void> _ehoRemainingToSend() async {
+    try {
+      final response = await http
+          .get(Uri.parse(apiEhoSendCount))
+          .timeout(const Duration(seconds: 15));
+      final data = json.decode(response.body);
+      if (response.statusCode == 200) {
+        setState(() {
+          _ehoRemainingToSendCount = data[0]['COUNT'];
+          _ehoRemainingToSendCount < 100 ? _isEhoUpdate = true : _isEhoUpdate = false;
+        });
+      } else {
+        setState(() {
+          _ehoRemainingToSendCount = json.decode(response.body)[''];
+          _ehoRemainingToSendCount < 100 ? _isEhoUpdate = true : _isEhoUpdate = false;
+        });
+      }
+    } catch (e) {
+      setState(() => _isEhoUpdate = false);
     }
   }
 
@@ -317,6 +346,20 @@ class _DashboardPage extends State<DashboardPage> {
   Widget _buildStatusIndicator() {
     return Row(
       children: [
+        Icon(Icons.circle, size: 12, color: _isEhoUpdate ? Colors.greenAccent : Colors.redAccent),
+        const SizedBox(width: 8),
+        Text(
+          _isEhoUpdate
+              ? "EHO ONLINE : $_ehoRemainingToSendCount"
+              : "EHO OFFLINE : $_ehoRemainingToSendCount",
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            color: _isEhoUpdate ? Colors.greenAccent : Colors.redAccent,
+          ),
+        ),
+        const SizedBox(width: 20),
+        Divider(),
         Icon(Icons.circle, size: 12, color: _isApiOnline ? Colors.greenAccent : Colors.redAccent),
         const SizedBox(width: 8),
         Text(
