@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:station_msloyalty/AppConfig.dart';
+import 'package:station_msloyalty/Helper/CustomerAppBar.dart';
 import 'package:station_msloyalty/Helper/PumpBySaleReport.dart';
 import 'package:station_msloyalty/Helper/TextFieldDialog.dart';
 import 'package:station_msloyalty/Model/SaleDataModel.dart';
@@ -26,13 +27,15 @@ class _DashboardPage extends State<DashboardPage> {
   final String apiUrl = "${AppConfig.apiUrl}/api/sales/recent";
   final String apiEhoSendCount = "${AppConfig.apiUrl}/api/eho/send-count";
 
-  final supabase = Supabase.instance.client;
-
-  List<dynamic> _salesData = [];
-  bool _isLoadingSales = false;
   bool _isApiOnline = false;
   bool _isEhoUpdate = false;
+
   int _ehoRemainingToSendCount = 0;
+
+  final supabase = Supabase.instance.client;
+
+  bool _isLoadingSales = false;
+  List<dynamic> _salesData = [];
   Timer? _statusTimer;
   DateTimeRange? _selectedDateRange; // ရက်စွဲ နှစ်ခုအတွက်
   // Map<String, dynamic>? _sysControl;
@@ -84,8 +87,6 @@ class _DashboardPage extends State<DashboardPage> {
     _statusTimer = Timer.periodic(const Duration(seconds: 5), (timer) async {
       await _checkConnection();
       await _ehoRemainingToSend();
-      print("API Status: $_isApiOnline");
-      print("EHO Remaining to send: $_ehoRemainingToSendCount");
     });
   }
 
@@ -109,12 +110,18 @@ class _DashboardPage extends State<DashboardPage> {
     try {
       final response = await http.get(Uri.parse(apiUrl)).timeout(const Duration(seconds: 15));
       if (response.statusCode == 200) {
-        setState(() {
-          _isApiOnline = response.statusCode == 200;
-        });
+        if (mounted) {
+          setState(() {
+            _isApiOnline = true;
+          });
+        }
       }
     } catch (e) {
-      setState(() => _isApiOnline = false);
+      if (mounted) {
+        setState(() {
+          _isApiOnline = false;
+        });
+      }
     }
   }
 
@@ -127,18 +134,27 @@ class _DashboardPage extends State<DashboardPage> {
           .timeout(const Duration(seconds: 15));
       final data = json.decode(response.body);
       if (response.statusCode == 200) {
-        setState(() {
-          _ehoRemainingToSendCount = data[0]['COUNT'];
-          _ehoRemainingToSendCount < 100 ? _isEhoUpdate = true : _isEhoUpdate = false;
-        });
+        if (mounted) {
+          setState(() {
+            _ehoRemainingToSendCount = data[0]['COUNT'];
+            _ehoRemainingToSendCount < 100 ? _isEhoUpdate = true : _isEhoUpdate = false;
+          });
+        }
       } else {
-        setState(() {
-          _ehoRemainingToSendCount = json.decode(response.body)[''];
-          _ehoRemainingToSendCount < 100 ? _isEhoUpdate = true : _isEhoUpdate = false;
-        });
+        if (mounted) {
+          setState(() {
+            _ehoRemainingToSendCount = json.decode(response.body)[''];
+            _ehoRemainingToSendCount < 100 ? _isEhoUpdate = true : _isEhoUpdate = false;
+          });
+        }
       }
     } catch (e) {
-      setState(() => _isEhoUpdate = false);
+      if (mounted) {
+        setState(() {
+          _ehoRemainingToSendCount = 0;
+          _isEhoUpdate = false;
+        });
+      }
     }
   }
 
@@ -272,12 +288,10 @@ class _DashboardPage extends State<DashboardPage> {
       if (response.statusCode == 200) {
         setState(() {
           _salesData = json.decode(response.body);
-          _isApiOnline = true;
         });
       }
     } catch (e) {
       debugPrint("Fetch Error: $e");
-      setState(() => _isApiOnline = false);
     } finally {
       setState(() => _isLoadingSales = false);
     }
@@ -286,39 +300,7 @@ class _DashboardPage extends State<DashboardPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Row(
-          children: [
-            Image.asset('assets/images/moonsun_logo.png', height: 30),
-            const SizedBox(width: 10),
-            const Text("Station MS Loyalty Dashboard"),
-          ],
-        ),
-        backgroundColor: Colors.blueGrey.shade900,
-        foregroundColor: Colors.white,
-        actions: [
-          const SizedBox(width: 20),
-          _buildStatusIndicator(),
-          IconButton(
-            onPressed: _fetchLatestSales,
-            icon: const Icon(Icons.refresh),
-            tooltip: "Refresh Data",
-          ),
-          const SizedBox(width: 10),
-          // Sidebar ကို ဖွင့်မည့် ခလုတ်
-          Builder(
-            builder: (context) => IconButton(
-              icon: const Icon(Icons.more_time),
-              onPressed: () {
-                Scaffold.of(context).openEndDrawer();
-              },
-            ),
-          ),
-          const SizedBox(width: 20),
-          Text("ယနေ့ရက်စွဲ: ${DateFormat('dd-MM-yyyy').format(DateTime.now())}"),
-          const SizedBox(width: 20),
-        ],
-      ),
+      appBar: CustomizeAppBar(),
 
       endDrawer: _buildRightSidebar(),
       body: _isLoadingSales
@@ -340,38 +322,6 @@ class _DashboardPage extends State<DashboardPage> {
                 ),
               ],
             ),
-    );
-  }
-
-  Widget _buildStatusIndicator() {
-    return Row(
-      children: [
-        Icon(Icons.circle, size: 12, color: _isEhoUpdate ? Colors.greenAccent : Colors.redAccent),
-        const SizedBox(width: 8),
-        Text(
-          _isEhoUpdate
-              ? "EHO ONLINE : $_ehoRemainingToSendCount"
-              : "EHO OFFLINE : $_ehoRemainingToSendCount",
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
-            color: _isEhoUpdate ? Colors.greenAccent : Colors.redAccent,
-          ),
-        ),
-        const SizedBox(width: 20),
-        Divider(),
-        Icon(Icons.circle, size: 12, color: _isApiOnline ? Colors.greenAccent : Colors.redAccent),
-        const SizedBox(width: 8),
-        Text(
-          _isApiOnline ? "API ONLINE" : "API OFFLINE",
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
-            color: _isApiOnline ? Colors.greenAccent : Colors.redAccent,
-          ),
-        ),
-        const SizedBox(width: 20),
-      ],
     );
   }
 
@@ -407,7 +357,7 @@ class _DashboardPage extends State<DashboardPage> {
         // ၁။ Fixed Header အပိုင်း (ဒီကောင်က Scroll မဖြစ်ပါ)
         Container(
           decoration: BoxDecoration(
-            color: Colors.blueGrey,
+            color: Colors.white,
             border: Border.all(color: Colors.teal), // ပတ်ပတ်လည် Border
           ),
           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8), // Padding
@@ -417,7 +367,7 @@ class _DashboardPage extends State<DashboardPage> {
                 flex: 0,
                 child: Text(
                   'No',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
                   textAlign: TextAlign.center,
                 ),
               ),
@@ -425,7 +375,7 @@ class _DashboardPage extends State<DashboardPage> {
                 flex: 2,
                 child: Text(
                   '  Voucher No',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
                   textAlign: TextAlign.center,
                 ),
               ),
@@ -433,7 +383,7 @@ class _DashboardPage extends State<DashboardPage> {
                 flex: 2,
                 child: Text(
                   'Fuel Type',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
                   textAlign: TextAlign.center,
                 ),
               ),
@@ -441,7 +391,7 @@ class _DashboardPage extends State<DashboardPage> {
                 flex: 2,
                 child: Text(
                   'Today Price',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
                   textAlign: TextAlign.center,
                 ),
               ),
@@ -449,7 +399,7 @@ class _DashboardPage extends State<DashboardPage> {
                 flex: 3,
                 child: Text(
                   'Date & Time',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
                   textAlign: TextAlign.center,
                 ),
               ),
@@ -457,7 +407,7 @@ class _DashboardPage extends State<DashboardPage> {
                 flex: 2,
                 child: Text(
                   'Vehicle No',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
                   textAlign: TextAlign.center,
                 ),
               ),
@@ -465,7 +415,7 @@ class _DashboardPage extends State<DashboardPage> {
                 flex: 2,
                 child: Text(
                   'Sale Type',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
                   textAlign: TextAlign.center,
                 ),
               ),
@@ -473,7 +423,7 @@ class _DashboardPage extends State<DashboardPage> {
                 flex: 2,
                 child: Text(
                   'Liter',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
                   textAlign: TextAlign.center,
                 ),
               ),
@@ -481,7 +431,7 @@ class _DashboardPage extends State<DashboardPage> {
                 flex: 2,
                 child: Text(
                   'Amount  ',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
                   textAlign: TextAlign.center,
                 ),
               ),
@@ -489,7 +439,7 @@ class _DashboardPage extends State<DashboardPage> {
                 flex: 2,
                 child: Text(
                   'Action  ',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
                   textAlign: TextAlign.center,
                 ),
               ),
@@ -571,7 +521,7 @@ class _DashboardPage extends State<DashboardPage> {
                                 )
                               : _buildTableCell(
                                   IconButton(
-                                    onPressed: () {},
+                                    onPressed: () => null,
                                     icon: const Icon(
                                       Icons.not_interested_rounded,
                                       size: 20,
@@ -872,68 +822,121 @@ class _DashboardPage extends State<DashboardPage> {
 
   Widget _buildDateSearchRow() {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.only(right: 12, top: 10, bottom: 10, left: 12),
       color: Colors.blueGrey.shade50,
       child: Row(
         children: [
-          _dateTextField(_startDateController, "From Date"),
-          _timeTextField(_startTimeController, "Start Time"),
-
-          const SizedBox(width: 20),
-          const Text(" TO ", style: TextStyle(color: Colors.grey)),
-          const SizedBox(width: 20),
-
-          _dateTextField(_endDateController, "To Date"),
-          _timeTextField(_endTimeController, "End Time"),
-
-          SizedBox(width: 20),
-
-          // --- Search Button ---
-          ElevatedButton(
-            onPressed: () {
-              // TextField မှ အချိန်များကို ယူပြီး DateTime ပြုလုပ်ခြင်း
-              final start = _combineDateAndTime(
-                _selectedDateRange!.start,
-                _startTimeController.text,
-              );
-              final end = _combineDateAndTime(_selectedDateRange!.end, _endTimeController.text);
-
-              print("Start: $start, End: $end");
-              _searchSalesByDate(start, end);
-              _fetchSysControlByRange(start, end);
-            },
-            style: ElevatedButton.styleFrom(
-              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-              backgroundColor: Colors.teal,
-              foregroundColor: Colors.white,
-            ),
-            child: Row(children: [Icon(Icons.search), SizedBox(width: 8), Text("Search")]),
-          ),
-
-          const Spacer(),
-          Row(
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Row(
+                children: [
+                  _dateTextField(_startDateController, "From Date"),
+                  _timeTextField(_startTimeController, "Start Time"),
+                ],
+              ),
+
+              const SizedBox(width: 10),
+              const Text(" TO ", style: TextStyle(color: Colors.grey)),
+              const SizedBox(width: 10),
+
+              Row(
+                children: [
+                  _dateTextField(_endDateController, "To Date"),
+                  _timeTextField(_endTimeController, "End Time"),
+                ],
+              ),
+            ],
+          ),
+          SizedBox(width: 10),
+          Column(
+            children: [
+              // --- Search Button ---
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue,
-                  foregroundColor: Colors.white,
+                  backgroundColor: Colors.white,
+                  foregroundColor: Colors.teal,
                 ),
                 onPressed: () {
-                  // List<SaleData> salesList = _salesData.map((x) => SaleData.fromMap(x)).toList();
-                  exportSaleDataReport(
-                    _salesData.toList(),
-                    AppConfig.stationName,
-                    "${DateFormat('dd-MM-yyyy').format(_startDate)} ${_startTimeController.text}",
-                    "${DateFormat('dd-MM-yyyy').format(_endDate)} ${_endTimeController.text}",
+                  // TextField မှ အချိန်များကို ယူပြီး DateTime ပြုလုပ်ခြင်း
+                  final start = _combineDateAndTime(
+                    _selectedDateRange!.start,
+                    _startTimeController.text,
                   );
+                  final end = _combineDateAndTime(_selectedDateRange!.end, _endTimeController.text);
+
+                  print("Start: $start, End: $end");
+                  _searchSalesByDate(start, end);
+                  _fetchSysControlByRange(start, end);
                 },
+                child: Row(children: [Icon(Icons.search), SizedBox(width: 8), Text("Search")]),
+              ),
+              SizedBox(height: 10),
+              // --- Search Button ---
+              ElevatedButton(
+                onPressed: () {
+                  _fetchLatestSales();
+                },
+                style: ElevatedButton.styleFrom(
+                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                  backgroundColor: Colors.teal,
+                  foregroundColor: Colors.white,
+                ),
                 child: Row(
                   children: [
-                    Icon(Icons.data_thresholding_rounded),
+                    Icon(Icons.receipt_long_rounded),
                     SizedBox(width: 8),
-                    Text("Pump By Sale Report"),
+                    Text("Last 20 Sales"),
                   ],
                 ),
+              ),
+            ],
+          ),
+
+          SizedBox(width: 10),
+          Spacer(),
+
+          Row(
+            children: [
+              Column(
+                children: [
+                  ElevatedButton(
+                    onPressed: () {
+                      // Handle button press
+                    },
+                    child: Row(
+                      children: [
+                        Icon(Icons.data_thresholding_rounded),
+                        SizedBox(width: 8),
+                        Text("Sale Detail Report"),
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: 10),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      foregroundColor: Colors.white,
+                    ),
+                    onPressed: () {
+                      // List<SaleData> salesList = _salesData.map((x) => SaleData.fromMap(x)).toList();
+                      exportSaleDataReport(
+                        _salesData.toList(),
+                        AppConfig.stationName,
+                        "${DateFormat('dd-MM-yyyy').format(_startDate)} ${_startTimeController.text}",
+                        "${DateFormat('dd-MM-yyyy').format(_endDate)} ${_endTimeController.text}",
+                      );
+                    },
+                    child: Row(
+                      children: [
+                        Icon(Icons.data_thresholding_rounded),
+                        SizedBox(width: 8),
+                        Text("Sale Summary Report"),
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: 10),
+                ],
               ),
               SizedBox(width: 10),
               Column(
