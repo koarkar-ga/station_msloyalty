@@ -1,16 +1,19 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:station_msloyalty/AppConfig.dart';
-import 'package:station_msloyalty/Helper/CustomerAppBar.dart';
+import 'package:station_msloyalty/Helper/BuildProgessOverlay.dart';
+import 'package:station_msloyalty/Helper/MsAppBar.dart';
 import 'package:station_msloyalty/Helper/PumpBySaleReport.dart';
+import 'package:station_msloyalty/Helper/SaleDetailReport.dart';
 import 'package:station_msloyalty/Helper/TextFieldDialog.dart';
-import 'package:station_msloyalty/Model/SaleDataModel.dart';
-import 'package:station_msloyalty/config.dart';
-import 'package:station_msloyalty/main.dart';
+import 'package:station_msloyalty/Model/SaleLoadStatus.dart';
 import 'package:station_msloyalty/summary_view.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -22,25 +25,27 @@ class DashboardPage extends StatefulWidget {
 }
 
 class _DashboardPage extends State<DashboardPage> {
-  // API Configurations
-  // Windows Desktop တွင် local run ထားသော Node.js အတွက် localhost:3000 သုံးနိုင်သည်
-  final String apiUrl = "${AppConfig.apiUrl}/api/sales/recent";
-  final String apiEhoSendCount = "${AppConfig.apiUrl}/api/eho/send-count";
-
-  bool _isApiOnline = false;
-  bool _isEhoUpdate = false;
-
-  int _ehoRemainingToSendCount = 0;
-
   final supabase = Supabase.instance.client;
+  final StreamController<SalesLoadStatus> _salesStreamController =
+      StreamController<SalesLoadStatus>.broadcast();
+  final String apiUrl = "${AppConfig.apiUrl}/api/sales/recent";
+  double _dragStartY = 0;
+  Set<int> _selectedIndices = {}; // Selec   လုပ်ထားတဲ့ Index များ
+  int? _lastSelectedIndex; // နောက်ဆုံးနှိပ်ခဲ့တဲ့ Index
 
-  bool _isLoadingSales = false;
+  double _loadingPercent = 0.0; // 0.0 မှ 1.0 အထိ
+  bool _isLoadingSales = true;
+  List<dynamic> _allData = [];
   List<dynamic> _salesData = [];
-  Timer? _statusTimer;
+
   DateTimeRange? _selectedDateRange; // ရက်စွဲ နှစ်ခုအတွက်
   // Map<String, dynamic>? _sysControl;
   List<dynamic> _sysControlList = []; // API မှလာမည့် list ကို သိမ်းရန်
   bool isLoadingSidebar = false; // Sidebar loading state အတွက်
+
+  //Range Text Controller for Time Closed
+  TextEditingController _rangeTimeClosedController = TextEditingController();
+
   // Start နှင့် End Time အတွက် Controller များ
   final TextEditingController _startDateController = TextEditingController(
     text: DateFormat('yyyy-MM-dd').format(DateTime.now()),
@@ -82,12 +87,6 @@ class _DashboardPage extends State<DashboardPage> {
     // ၃။ App စဖွင့်ချင်း Data ခေါ်ယူခြင်း
     // ဤနေရာတွင် API နှစ်ခုလုံးကို တစ်ခါတည်း ခေါ်ပါမည်
     _fetchInitialData(todayStart, todayEnd);
-
-    // ၅ စက္ကန့်တစ်ခါ API Status ကို စစ်ဆေးရန်
-    _statusTimer = Timer.periodic(const Duration(seconds: 5), (timer) async {
-      await _checkConnection();
-      await _ehoRemainingToSend();
-    });
   }
 
   // Initial Data Fetching
@@ -101,96 +100,157 @@ class _DashboardPage extends State<DashboardPage> {
 
   @override
   void dispose() {
-    _statusTimer?.cancel();
     super.dispose();
   }
 
-  // API Connection အခြေအနေကို စစ်ဆေးခြင်း
-  Future<void> _checkConnection() async {
-    try {
-      final response = await http.get(Uri.parse(apiUrl)).timeout(const Duration(seconds: 15));
-      if (response.statusCode == 200) {
-        if (mounted) {
-          setState(() {
-            _isApiOnline = true;
-          });
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isApiOnline = false;
-        });
-      }
-    }
+  //API Control with Loading Percentage
+  Future<List<dynamic>> fetchWithProgress(String apiUrl) async {
+    HttpClient client = HttpClient();
+    HttpClientRequest request = await client.getUrl(Uri.parse(apiUrl));
+    HttpClientResponse response = await request.close();
+
+    String? countHeader = response.headers.value('x-total-count');
+    int totalRecords = countHeader != null ? int.parse(countHeader) : 0;
+
+    int currentRecordCount = 0;
+    _salesStreamController.add(
+      SalesLoadStatus(data: List.from(_allData), progress: 0.0, isLoading: true),
+    );
+    _salesData.clear();
+    _allData.clear();
+
+    response
+        .transform(utf8.decoder)
+        .transform(const LineSplitter())
+        .listen(
+          (String line) {
+            String cleanLine = line.trim();
+            if (cleanLine.isNotEmpty && cleanLine != "[" && cleanLine != "]") {
+              if (cleanLine.endsWith(",")) {
+                cleanLine = cleanLine.substring(0, cleanLine.length - 1);
+              }
+
+              try {
+                var row = jsonDecode(cleanLine);
+                _allData.add(row);
+                currentRecordCount++;
+
+                if (totalRecords > 0) {
+                  double progress = currentRecordCount / totalRecords;
+
+                  // ဒေတာ ၁၀ ခုရောက်တိုင်း Stream ထဲကို အချက်အလက်အသစ် ပို့မယ်
+                  // ဒီနေရာမှာ setState ခေါ်စရာ မလိုတော့ဘူး!
+                  if (currentRecordCount % 10 == 0 || currentRecordCount == totalRecords) {
+                    print(_allData.length);
+                    _salesStreamController.add(
+                      SalesLoadStatus(
+                        data: List.from(_allData),
+                        progress: progress,
+                        isLoading: true,
+                      ),
+                    );
+                  }
+                }
+              } catch (e) {
+                print("Row Error: $e");
+              }
+            }
+          },
+          onDone: () {
+            // အားလုံးပြီးသွားရင် Loading False လုပ်ပြီး Final Data ကို ပို့မယ်
+
+            _salesStreamController.add(
+              SalesLoadStatus(data: List.from(_allData), progress: 1.0, isLoading: false),
+            );
+          },
+        );
+    return _allData;
   }
 
-  // EHO Reaming to send count
-  // API Connection အခြေအနေကို စစ်ဆေးခြင်း
-  Future<void> _ehoRemainingToSend() async {
-    try {
-      final response = await http
-          .get(Uri.parse(apiEhoSendCount))
-          .timeout(const Duration(seconds: 15));
-      final data = json.decode(response.body);
-      if (response.statusCode == 200) {
-        if (mounted) {
-          setState(() {
-            _ehoRemainingToSendCount = data[0]['COUNT'];
-            _ehoRemainingToSendCount < 100 ? _isEhoUpdate = true : _isEhoUpdate = false;
-          });
+  // Select Handling SystemControl Time Closed Range
+  void _handleTap(int index) {
+    final bool isShiftPressed = HardwareKeyboard.instance.isShiftPressed;
+
+    setState(() {
+      if (isShiftPressed) {
+        // ၁။ Shift ဖိထားလျှင်: Range အလိုက် Select လုပ်မည် (ယခင်အတိုင်း)
+        if (_lastSelectedIndex != null) {
+          int start = _lastSelectedIndex! < index ? _lastSelectedIndex! : index;
+          int end = _lastSelectedIndex! > index ? _lastSelectedIndex! : index;
+
+          // Shift နဲ့ ထပ်တိုးချင်တာဆိုရင် Clear မလုပ်ဘူး၊
+          // ဒါပေမဲ့ Range အသစ်ပဲ လိုချင်ရင်တော့ ဒီမှာ clear() တစ်ချက်လုပ်နိုင်တယ်
+          _selectedIndices.clear();
+          for (int i = start; i <= end; i++) {
+            _selectedIndices.add(i);
+          }
+        } else {
+          _selectedIndices.add(index);
         }
       } else {
-        if (mounted) {
-          setState(() {
-            _ehoRemainingToSendCount = json.decode(response.body)[''];
-            _ehoRemainingToSendCount < 100 ? _isEhoUpdate = true : _isEhoUpdate = false;
-          });
-        }
+        // ၂။ Shift မဖိထားလျှင်: အရင် Select လုပ်သမျှ အကုန်ဖြုတ်ပြီး ယခုတစ်ခုတည်းကိုပဲ ရွေးမည်
+        _selectedIndices.clear();
+        _selectedIndices.add(index);
+        _lastSelectedIndex = index; // Range စမှတ်အဖြစ် မှတ်ထားမယ်
       }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _ehoRemainingToSendCount = 0;
-          _isEhoUpdate = false;
-        });
-      }
-    }
+
+      // အပေါ်က Date Range Field ကို Update လုပ်မယ်
+      _updateUpperRangeField();
+    });
   }
 
-  Future<void> _searchSalesByDate(DateTime start, DateTime end) async {
-    // Loading စတင်ဖွင့်ခြင်း
-    setState(() => _isLoadingSales = true);
+  // Update the upper range field based on selected indices
+  void _updateUpperRangeField() {
+    if (_selectedIndices.isEmpty) return;
 
+    // ၁။ ရွေးထားတဲ့ Index တွေကို စီမယ်
+    List<int> sortedIndices = _selectedIndices.toList()..sort();
+
+    // ၂။ Start Date အတွက် ပထမဆုံးရွေးတဲ့ Item အချိန်ကို ယူမယ်
+    DateTime startDT = DateTime.parse(_sysControlList[sortedIndices.first]['Sdate']);
+
+    DateTime endDT;
+
+    // ၃။ Logic စစ်မယ်: တစ်ခုတည်းလား၊ အများကြီးလား?
+    if (_selectedIndices.length == 1) {
+      // တစ်ခုတည်းဆိုရင် End Date ကို ဒီနေ့ည ၂၃:၅၉:၅၉ သတ်မှတ်မယ်
+      DateTime now = DateTime.now();
+      endDT = DateTime(now.year, now.month, now.day, 23, 59, 59);
+    } else {
+      // အများကြီးဆိုရင် နောက်ဆုံး Item ရဲ့ အချိန်ကို ယူမယ်
+      endDT = DateTime.parse(_sysControlList[sortedIndices.last]['Sdate']);
+    }
+
+    // ၄။ Controller များထဲသို့ Set လုပ်ခြင်း
+    setState(() {
+      // Start Field များ (ရွေးထားတဲ့ Item ရဲ့ အချိန်)
+      _startDateController.text = DateFormat('dd/MM/yyyy').format(startDT);
+      _startTimeController.text = DateFormat('HH:mm:ss').format(startDT);
+
+      // End Field များ (Today 23:59:59 သို့မဟုတ် Last Item အချိန်)
+      _endDateController.text = DateFormat('dd/MM/yyyy').format(endDT);
+      _endTimeController.text = DateFormat('HH:mm:ss').format(endDT);
+
+      _selectedDateRange = DateTimeRange(start: startDT, end: endDT);
+    });
+  }
+
+  //Search Sale By Date
+  Future<void> _searchSalesByDate(DateTime start, DateTime end) async {
     // API အတွက် Format ပြောင်းခြင်း
     final String startStr = DateFormat('yyyy-MM-dd HH:mm:ss').format(start);
     final String endStr = DateFormat('yyyy-MM-dd HH:mm:ss').format(end);
 
     // Node.js API Route (Search endpoint ကို သုံးထားပါသည်)
-    final url = Uri.parse(
-      '${AppConfig.apiUrl}/api/sales/search?startDate=$startStr&endDate=$endStr',
-    );
+    final url = '${AppConfig.apiUrl}/api/sales/search?startDate=$startStr&endDate=$endStr';
+
+    // စတင်ချိန်မှာ Loading True နဲ့ 0% ပို့လိုက်မယ်
+    _salesStreamController.add(SalesLoadStatus(data: [], progress: 0.0, isLoading: true));
 
     try {
-      final response = await http.get(url);
-
-      if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
-        setState(() {
-          _salesData = data;
-          _isApiOnline = true; // Connection status ကိုပါ update လုပ်ပေးခြင်း
-        });
-      } else {
-        debugPrint("Server Error: ${response.statusCode}");
-      }
+      await fetchWithProgress(url);
     } catch (e) {
       debugPrint("Sales Fetch Error: $e");
-      if (mounted) setState(() => _isApiOnline = false);
-    } finally {
-      // ပြီးဆုံးသွားချိန်တွင် Loading ပြန်ပိတ်ခြင်း
-      if (mounted) {
-        setState(() => _isLoadingSales = false);
-      }
     }
   }
 
@@ -282,49 +342,61 @@ class _DashboardPage extends State<DashboardPage> {
 
   // နောက်ဆုံး Sale ၂၀ ကို API မှ ဆွဲယူခြင်း
   Future<void> _fetchLatestSales() async {
-    setState(() => _isLoadingSales = true);
+    // စတင်ချိန်မှာ Loading True နဲ့ 0% ပို့လိုက်မယ်
+    _salesStreamController.add(SalesLoadStatus(data: [], progress: 0.0, isLoading: true));
     try {
-      final response = await http.get(Uri.parse(apiUrl));
-      if (response.statusCode == 200) {
-        setState(() {
-          _salesData = json.decode(response.body);
-        });
-      }
+      await fetchWithProgress(apiUrl);
     } catch (e) {
       debugPrint("Fetch Error: $e");
-    } finally {
-      setState(() => _isLoadingSales = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: CustomizeAppBar(),
+      appBar: AppBar(title: MsAppBar()),
 
       endDrawer: _buildRightSidebar(),
-      body: _isLoadingSales
-          ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                //_buildSearchHeader(),
-                _buildDateSearchRow(), // Date Range Picker Button
-                //Summary Table ကို ခေါ်သုံးပါ ---
-                SummaryView(
-                  saleSummaryTable: _buildTypeSummaryTable(),
-                  fuelSummaryTable: _buildFuelSummaryTable(),
-                ),
-                // Header Information
-                _buildHeaderInfo(),
-                Expanded(
-                  flex: 1,
-                  child: _salesData.isEmpty ? _buildEmptyState() : _buildDataTable(),
-                ),
-              ],
-            ),
+      body: StreamBuilder<SalesLoadStatus>(
+        stream: _salesStreamController.stream,
+        builder: (context, snapshot) {
+          // လက်ရှိ status ကို ယူမယ် (မရှိသေးရင် default status ပေးထားမယ်)
+          final status = snapshot.data ?? SalesLoadStatus(data: [], progress: 0.0, isLoading: true);
+
+          _salesData = status.data;
+          return Stack(
+            children: [
+              Column(
+                children: [
+                  //_buildSearchHeader(),
+                  _buildDateSearchRow(status.data), // Date Range Picker Button
+                  //Summary Table ကို ခေါ်သုံးပါ ---
+                  SummaryView(
+                    saleSummaryTable: _buildTypeSummaryTable(),
+                    fuelSummaryTable: _buildFuelSummaryTable(),
+                  ),
+                  // Header Information
+                  _buildHeaderInfo(),
+                  Expanded(
+                    flex: 1,
+                    child: _salesData.isEmpty
+                        ? _buildEmptyState()
+                        : _buildDataTable(status.data, status.isLoading),
+                  ),
+                ],
+              ),
+              Visibility(
+                visible: status.isLoading,
+                child: buildProgressOverlay(status.progress, status.data.length),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 
+  // Build Header Information
   Widget _buildHeaderInfo() {
     double grandTotalLiter = _salesData.fold(
       0,
@@ -351,7 +423,8 @@ class _DashboardPage extends State<DashboardPage> {
     );
   }
 
-  Widget _buildDataTable() {
+  // Build Data Table
+  Widget _buildDataTable(List<dynamic> data, bool isLoading) {
     return Column(
       children: [
         // ၁။ Fixed Header အပိုင်း (ဒီကောင်က Scroll မဖြစ်ပါ)
@@ -449,14 +522,14 @@ class _DashboardPage extends State<DashboardPage> {
 
         // ၂။ Scrollable Body အပိုင်း
         Expanded(
-          child: _isLoadingSales
+          child: isLoading
               ? const Center(child: CircularProgressIndicator())
-              : _salesData.isEmpty
+              : data.isEmpty && !isLoading
               ? const Center(child: Text("မှတ်တမ်းမရှိပါ"))
               : ListView.builder(
-                  itemCount: _salesData.length,
+                  itemCount: data.length,
                   itemBuilder: (context, index) {
-                    final sale = _salesData[index];
+                    final sale = data[index];
                     // index ကို ၂ နဲ့စားလို့ ပြတ်ရင် အရောင်ဖျော့၊ မပြတ်ရင် အဖြူရောင်
                     final bool isEven = index % 2 == 0;
                     final Color rowColor = isEven ? Colors.blueGrey.shade50 : Colors.white;
@@ -542,6 +615,7 @@ class _DashboardPage extends State<DashboardPage> {
     );
   }
 
+  // Build Table Cell
   Widget _buildTableCell(
     dynamic content,
     int flexValue, {
@@ -574,6 +648,7 @@ class _DashboardPage extends State<DashboardPage> {
     );
   }
 
+  // Sale Type Summary Table
   Widget _buildTypeSummaryTable() {
     final summaryData = _calculateSalesSummary();
 
@@ -644,6 +719,7 @@ class _DashboardPage extends State<DashboardPage> {
     );
   }
 
+  // Fuel Summary Table
   Widget _buildFuelSummaryTable() {
     final fuelData = _calculateFuelSummary();
 
@@ -749,78 +825,188 @@ class _DashboardPage extends State<DashboardPage> {
   // Sidebar Widget
   Widget _buildRightSidebar() {
     return Drawer(
-      width: 350, // Sidebar အကျယ်ကို အနည်းငယ် တိုးထားပါသည်
+      width: 250,
+
       child: Column(
         children: [
           DrawerHeader(
             decoration: BoxDecoration(color: Colors.blueGrey.shade900),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.history_toggle_off, color: Colors.white, size: 40),
-                const SizedBox(height: 10),
-                const Text(
-                  "System Control Logs",
-                  style: TextStyle(color: Colors.white, fontSize: 18),
-                ),
-                Text(
-                  "${DateFormat('dd/MM HH:mm').format(_selectedDateRange!.start)} TO ${DateFormat('dd/MM HH:mm').format(_selectedDateRange!.end)}",
-                  style: const TextStyle(color: Colors.white70, fontSize: 11),
-                ),
-              ],
+            child: InkWell(
+              // Header ကို နှိပ်ရင်လည်း Date ရွေးလို့ရအောင် လုပ်ထားတယ်
+              onTap: () => _pickDateRange(context),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.history_toggle_off, color: Colors.white, size: 40),
+                  const SizedBox(height: 10),
+                  const Text(
+                    "System Control Logs",
+                    style: TextStyle(color: Colors.white, fontSize: 18),
+                  ),
+                  const SizedBox(height: 5),
+                  // လက်ရှိရွေးထားတဲ့ Range ကို ပြပေးမယ်
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white10,
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.date_range, color: Colors.white),
+                        Text(
+                          "${DateFormat('dd/MM/yyyy').format(_selectedDateRange!.start)} - ${DateFormat('dd/MM/yyyy').format(_selectedDateRange!.end)}",
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.normal,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
           Expanded(
             child: _sysControlList.isEmpty
                 ? const Center(child: Text("No records found in this range."))
-                : ListView.builder(
-                    itemCount: _sysControlList.length,
-                    itemBuilder: (context, index) {
-                      final item = _sysControlList[index];
-                      return Card(
-                        margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                        elevation: 2,
-                        child: ListTile(
-                          leading: CircleAvatar(
-                            backgroundColor: Colors.blueGrey.shade100,
-                            child: Text("${index + 1}", style: const TextStyle(fontSize: 12)),
-                          ),
-                          title: Text(
-                            "HO: ${item['HO'] ?? 'N/A'}",
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text("Option: ${item['soption'] ?? '-'}"),
-                              Text(
-                                "Date: ${item['Sdate'] != null ? DateFormat('dd-MM-yyyy HH:mm').format(DateTime.parse(item['Sdate'])) : '-'}",
-                                style: const TextStyle(fontSize: 11, color: Colors.blueAccent),
-                              ),
-                            ],
-                          ),
-                          isThreeLine: true,
-                        ),
-                      );
+                : // UI ထဲက ListView
+                  GestureDetector(
+                    onVerticalDragStart: (details) {
+                      // Mouse စဖိတဲ့နေရာက Y position ကို မှတ်မယ်
+                      _dragStartY = details.localPosition.dy;
+
+                      // Shift မဖိထားရင် အဟောင်းတွေကို ရှင်းပစ်ချင်ရင် ဒီမှာရှင်းနိုင်ပါတယ်
+                      if (!HardwareKeyboard.instance.isShiftPressed) {
+                        setState(() => _selectedIndices.clear());
+                      }
                     },
+                    onVerticalDragUpdate: (details) {
+                      double currentY = details.localPosition.dy;
+                      double itemHeight = 70.0; // သားကြီးရဲ့ ListTile အမြင့် (Card margin ပါတွက်ပါ)
+
+                      // လက်ရှိ Mouse ရောက်နေတဲ့နေရာရဲ့ Index ကို တွက်မယ်
+                      int startIndex = (_dragStartY / itemHeight).floor();
+                      int currentIndex = (currentY / itemHeight).floor();
+
+                      setState(() {
+                        int start = startIndex < currentIndex ? startIndex : currentIndex;
+                        int end = startIndex > currentIndex ? startIndex : currentIndex;
+
+                        // Range ထဲက index တွေကို select လုပ်မယ်
+                        for (int i = start; i <= end; i++) {
+                          if (i >= 0 && i < _sysControlList.length) {
+                            _selectedIndices.add(i);
+                          }
+                        }
+                        _updateUpperRangeField(); // အပေါ်က Field ကိုပါ auto update လုပ်မယ်
+                      });
+                    },
+                    child: ListView.builder(
+                      itemCount: _sysControlList.length,
+                      itemBuilder: (context, index) {
+                        bool isSelected = _selectedIndices.contains(index);
+
+                        return InkWell(
+                          onTap: () => _handleTap(index),
+                          child: Container(
+                            color: isSelected
+                                ? Colors.blue
+                                : Colors.transparent, // Select ဖြစ်ရင် အရောင်ပြောင်းမယ်
+                            child: ListTile(
+                              title: Text(
+                                "Date: ${DateFormat('dd/MM/yyyy').format(DateTime.parse(_sysControlList[index]['Sdate'].toString()))}",
+                                style: isSelected
+                                    ? const TextStyle(color: Colors.white)
+                                    : const TextStyle(color: Colors.black),
+                              ),
+                              subtitle: Text(
+                                "Time: ${DateFormat('HH:mm:ss').format(DateTime.parse(_sysControlList[index]['Sdate'].toString()))}",
+                                style: isSelected
+                                    ? const TextStyle(color: Colors.white)
+                                    : const TextStyle(color: Colors.black),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
                   ),
           ),
-          // Sidebar အောက်ခြေတွင် Refresh လုပ်ရန် ခလုတ်
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: ElevatedButton.icon(
-              onPressed: () =>
-                  _fetchSysControlByRange(_selectedDateRange!.start, _selectedDateRange!.end),
-              icon: const Icon(Icons.refresh),
-              label: const Text("Update Sidebar"),
-            ),
+
+          Row(
+            children: [
+              // Start Date & Time
+              Expanded(
+                child: TextField(
+                  controller: _startDateController,
+                  decoration: InputDecoration(labelText: "Start Date"),
+                ),
+              ),
+              Expanded(
+                child: TextField(
+                  controller: _startTimeController,
+                  decoration: InputDecoration(labelText: "Start Time"),
+                ),
+              ),
+
+              const Icon(Icons.arrow_forward), // မြားလေးနဲ့ ပြရင် ပိုမိုက်တယ်
+              // End Date & Time
+              Expanded(
+                child: TextField(
+                  controller: _endDateController,
+                  decoration: InputDecoration(labelText: "End Date"),
+                ),
+              ),
+              Expanded(
+                child: TextField(
+                  controller: _endTimeController,
+                  decoration: InputDecoration(labelText: "End Time"),
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _buildDateSearchRow() {
+  // Pick Date Range
+  Future<void> _pickDateRange(BuildContext context) async {
+    DateTimeRange? newRange = await showDateRangePicker(
+      context: context,
+      initialDateRange: _selectedDateRange,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+      builder: (context, child) {
+        return Theme(
+          data: ThemeData.dark().copyWith(
+            colorScheme: const ColorScheme.dark(
+              primary: Colors.blueAccent,
+              onPrimary: Colors.white,
+              surface: Colors.blueGrey,
+              onSurface: Colors.white,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (newRange != null) {
+      setState(() {
+        _selectedDateRange = newRange;
+      });
+      // Data ကို ချက်ချင်း ပြန်ခေါ်မယ်
+      _fetchSysControlByRange(newRange.start, newRange.end);
+    }
+  }
+
+  // Date Search Row
+  Widget _buildDateSearchRow(List<dynamic> data) {
     return Container(
       padding: const EdgeInsets.only(right: 12, top: 10, bottom: 10, left: 12),
       color: Colors.blueGrey.shade50,
@@ -829,6 +1015,7 @@ class _DashboardPage extends State<DashboardPage> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              //START Date & Time
               Row(
                 children: [
                   _dateTextField(_startDateController, "From Date"),
@@ -839,7 +1026,7 @@ class _DashboardPage extends State<DashboardPage> {
               const SizedBox(width: 10),
               const Text(" TO ", style: TextStyle(color: Colors.grey)),
               const SizedBox(width: 10),
-
+              //END Date & Time
               Row(
                 children: [
                   _dateTextField(_endDateController, "To Date"),
@@ -857,7 +1044,7 @@ class _DashboardPage extends State<DashboardPage> {
                   backgroundColor: Colors.white,
                   foregroundColor: Colors.teal,
                 ),
-                onPressed: () {
+                onPressed: () async {
                   // TextField မှ အချိန်များကို ယူပြီး DateTime ပြုလုပ်ခြင်း
                   final start = _combineDateAndTime(
                     _selectedDateRange!.start,
@@ -866,16 +1053,15 @@ class _DashboardPage extends State<DashboardPage> {
                   final end = _combineDateAndTime(_selectedDateRange!.end, _endTimeController.text);
 
                   print("Start: $start, End: $end");
-                  _searchSalesByDate(start, end);
-                  _fetchSysControlByRange(start, end);
+                  await _searchSalesByDate(start, end);
                 },
                 child: Row(children: [Icon(Icons.search), SizedBox(width: 8), Text("Search")]),
               ),
               SizedBox(height: 10),
               // --- Search Button ---
               ElevatedButton(
-                onPressed: () {
-                  _fetchLatestSales();
+                onPressed: () async {
+                  await _fetchLatestSales();
                 },
                 style: ElevatedButton.styleFrom(
                   padding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
@@ -901,8 +1087,36 @@ class _DashboardPage extends State<DashboardPage> {
               Column(
                 children: [
                   ElevatedButton(
-                    onPressed: () {
-                      // Handle button press
+                    onPressed: () async {
+                      // ၁။ Loading ကို အစမှာတင် တန်းဖွင့်လိုက်မယ်
+                      _salesStreamController.add(
+                        SalesLoadStatus(data: [], progress: 0.0, isLoading: true),
+                      );
+
+                      try {
+                        List<Map<String, dynamic>> salesDetailList;
+                        var saleDetailUrl =
+                            "${AppConfig.apiUrl}/api/salesdetail/search?startDate=${DateFormat('yyyy-MM-dd').format(_startDate)} ${_startTimeController.text}&endDate=${DateFormat('yyyy-MM-dd').format(_endDate)} ${_endTimeController.text}";
+
+                        // ၂။ ဒေတာဆွဲမယ် (fetchWithProgress ထဲမှာ Percentage တက်နေလိမ့်မယ်)
+                        await fetchWithProgress(saleDetailUrl).then((val) {
+                          salesDetailList = List<Map<String, dynamic>>.from(val);
+                        });
+
+                        // ၃။ ဒေတာရပြီဆိုရင် Export မစခင် စာသားလေးပြောင်းချင်ရင် ပြောင်းလို့ရတယ်
+                        // (ဥပမာ "Excel ထုတ်နေပါသည်..." ဆိုပြီး UI မှာ ပြချင်ရင်)
+                        salesDetailList = List<Map<String, dynamic>>.from(data);
+                        // ၄။ Excel ထုတ်မယ်
+                        await exportSaleDetailReport(salesDetailList);
+                      } catch (e) {
+                        print("Error: $e");
+                        // Error တက်ရင်လည်း Loading ပိတ်ပေးဖို့လိုတယ်
+                      } finally {
+                        // ၅။ အားလုံးပြီးသွားပြီ (သို့မဟုတ်) Error တက်သွားပြီဆိုရင် Loading ပြန်ပိတ်မယ်
+                        _salesStreamController.add(
+                          SalesLoadStatus(data: data, progress: 1.0, isLoading: false),
+                        );
+                      }
                     },
                     child: Row(
                       children: [
@@ -966,7 +1180,7 @@ class _DashboardPage extends State<DashboardPage> {
                     children: [
                       SizedBox(width: 50, child: Text("Record")),
                       Text(":  "),
-                      Text("${_salesData.length}"),
+                      Text("${data.length}"),
                     ],
                   ),
                 ],
@@ -978,6 +1192,7 @@ class _DashboardPage extends State<DashboardPage> {
     );
   }
 
+  // Date Text Field
   Widget _dateTextField(TextEditingController controller, String label) {
     return Row(
       children: [
@@ -1066,6 +1281,7 @@ class _DashboardPage extends State<DashboardPage> {
     );
   }
 
+  // Time Text Field
   Widget _timeTextField(TextEditingController controller, String label) {
     return Row(
       children: [

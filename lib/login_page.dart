@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:station_msloyalty/Helper/MsAppBar.dart';
 import 'package:station_msloyalty/Services/AuthService.dart';
 import 'package:station_msloyalty/app_launcher_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -124,25 +125,7 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Login"),
-        centerTitle: true,
-        backgroundColor: Colors.transparent,
-        foregroundColor: Colors.black,
-        elevation: 0,
-
-        actions: [
-          IconButton(icon: const Icon(Icons.help_outline), onPressed: () async {}),
-          IconButton(onPressed: () async {}, icon: const Icon(Icons.minimize)),
-          const SizedBox(width: 8),
-          IconButton(
-            onPressed: () {
-              // Close button action
-            },
-            icon: const Icon(Icons.close, color: Colors.red),
-          ),
-        ],
-      ),
+      appBar: AppBar(title: MsAppBar()),
       body: Stack(
         children: [
           // ၁။ နောက်ခံပုံ (Background Image)
