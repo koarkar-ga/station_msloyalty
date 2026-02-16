@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:station_msloyalty/config.dart' as Config;
-import 'package:station_msloyalty/main.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class TextFieldDialog extends StatefulWidget {
@@ -11,6 +10,7 @@ class TextFieldDialog extends StatefulWidget {
   final String fuel_type;
   final String amount;
   final String sale_type;
+
   const TextFieldDialog({
     super.key,
     required this.supabase,
@@ -27,6 +27,8 @@ class TextFieldDialog extends StatefulWidget {
 
 class _TextFieldDialogState extends State<TextFieldDialog> {
   final TextEditingController _controller = TextEditingController();
+  bool _isLoading = false; // Loading status ကို ထိန်းချုပ်ရန်
+  String? _errorMessage; // Error message ကို UI မှာ ပြရန်
 
   @override
   void dispose() {
@@ -34,323 +36,232 @@ class _TextFieldDialogState extends State<TextFieldDialog> {
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return IconButton(
-      padding: EdgeInsets.zero,
-      icon: const Icon(Icons.qr_code_scanner, size: 32, color: Colors.green),
-      tooltip: 'Collect Point',
-      onPressed: () async {
-        _controller.text = '';
-        await showDialog(
-          context: context,
-          builder: (context) {
-            DateTime? _lastTapTime;
-            String _scannerBuffer = "";
-            return AlertDialog(
-              title: const Text('Point ရယူရန်အတွက် QR Scan ဖတ်ပါ'),
-              content: Container(
-                height: 250,
-                child: Column(
-                  children: [
-                    // Sale info card and collect action
-                    SizedBox(
-                      width: double.infinity,
-                      child: Card(
-                        margin: EdgeInsets.zero,
-                        child: Padding(
-                          padding: const EdgeInsets.all(12.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                'Sale Information',
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                              const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  SizedBox(child: Text('Voucher No'), width: 150),
-                                  Text(' : '),
-                                  Text('${widget.voc_no}'),
-                                ],
-                              ),
-                              Row(
-                                children: [
-                                  SizedBox(child: Text('Vehicle No'), width: 150),
-                                  Text(' : '),
-                                  Text('${widget.vehical_no.isNotEmpty ? widget.vehical_no : '-'}'),
-                                ],
-                              ),
+  Future<void> _handleCollect() async {
+    final String qrValue = _controller.text.trim();
+    if (qrValue.isEmpty) {
+      setState(() => _errorMessage = "QR Code ဖတ်ပေးပါဦး");
+      return;
+    }
 
-                              Row(
-                                children: [
-                                  SizedBox(child: Text('Fuel Type'), width: 150),
-                                  Text(' : '),
-                                  Text('${widget.fuel_type.isNotEmpty ? widget.fuel_type : '-'}'),
-                                ],
-                              ),
-                              Row(
-                                children: [
-                                  SizedBox(child: Text('Sale Type'), width: 150),
-                                  Text(' : '),
-                                  Text('${widget.sale_type.isNotEmpty ? widget.sale_type : '-'}'),
-                                ],
-                              ),
-                              Row(
-                                children: [
-                                  SizedBox(child: Text('Amount'), width: 150),
-                                  Text(' : '),
-                                  Text(
-                                    '${NumberFormat('#,###').format(double.tryParse(widget.amount) ?? 0)} MMK',
-                                    style: const TextStyle(color: Colors.green),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 10),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    SizedBox(height: 30),
-                    Card(
-                      child: Focus(
-                        // onKeyEvent: (FocusNode node, KeyEvent event) {
-                        //   // Control Key နှိပ်ထားစဉ် C သို့မဟုတ် V နှိပ်ပါက လျစ်လျူရှုရန်
-                        //   if (event.logicalKey == LogicalKeyboardKey.controlLeft ||
-                        //       event.logicalKey == LogicalKeyboardKey.controlRight) {
-                        //     return KeyEventResult
-                        //         .handled; // Shortcut ကို အလုပ်မလုပ်အောင် တားလိုက်ခြင်း
-                        //   }
-                        //   if ((HardwareKeyboard.instance.isControlPressed) &&
-                        //       (event.logicalKey == LogicalKeyboardKey.keyV ||
-                        //           event.logicalKey == LogicalKeyboardKey.keyC)) {
-                        //     return KeyEventResult.handled;
-                        //   }
-                        //   return KeyEventResult.ignored;
-                        // },
-                        child: TextField(
-                          controller: _controller,
-                          autofocus: true,
-                          // --- Copy/Paste/Select လုပ်ခြင်းကို ပိတ်ရန် ---
-                          //enableInteractiveSelection: false,
+    setState(() {
+      _isLoading = true; // Loading စပြမယ်
+      _errorMessage = null; // Error အဟောင်းရှိရင် ရှင်းမယ်
+    });
 
-                          // Mouse Cursor ကိုလည်း ပုံမှန်အတိုင်းပဲ ထားရန်
-                          mouseCursor: SystemMouseCursors.text,
-
-                          decoration: InputDecoration(
-                            labelText: 'Scan QR Only',
-                            hintText: 'Keyboard typing is disabled',
-                            filled: true,
-                            fillColor: Colors.grey.shade100,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(15.0),
-                              borderSide: BorderSide.none,
-                            ),
-                            prefixIcon: const Icon(Icons.qr_code_scanner, color: Colors.redAccent),
-                          ),
-
-                          // Enter နှိပ်လိုက်လျှင်သော်လည်းကောင်း၊ Scanner မှ Enter ပို့လျှင်သော်လည်းကောင်း အလုပ်လုပ်မည့်နေရာ
-                          onSubmitted: (value) {
-                            if (value.isNotEmpty) {
-                              _handleSearch(value); // သင်၏ ရှာဖွေမှု Logic ကို ဤနေရာတွင် ခေါ်ပါ
-                              _controller
-                                  .clear(); // နောက်တစ်ကြိမ် Scan ဖတ်ရန် အလွယ်တကူ ရှင်းထုတ်ခြင်း
-                            }
-                          },
-
-                          // စာရိုက်တာကို တားဆီးဖို့ onChanged ထဲမှာ စစ်ဆေးမယ်
-                          // onChanged: (value) {
-                          //   final now = DateTime.now();
-
-                          //   // စာလုံးတစ်လုံးနဲ့ တစ်လုံးကြား ရိုက်တဲ့ကြာချိန်ကို စစ်ဆေးခြင်း
-                          //   if (_lastTapTime != null) {
-                          //     final difference = now.difference(_lastTapTime!).inMilliseconds;
-
-                          //     // အကယ်၍ စာရိုက်တာ အရမ်းနှေးရင် (လူရိုက်တာဆိုရင်) စာသားကို ဖျက်ပစ်မယ်
-                          //     // Scanner က ပုံမှန်အားဖြင့် 1ms ကနေ 10ms အတွင်းပဲ ကြာပါတယ်
-                          //     if (difference > 50) {
-                          //       _controller.clear();
-                          //       return;
-                          //     }
-                          //   }
-                          //   _lastTapTime = now;
-                          // },
-
-                          // (Optional) အကယ်၍ စာသားအရေအတွက် တူတာနဲ့ Enter မလိုဘဲ အလုပ်လုပ်စေချင်လျှင်
-                          // onChanged: (value) {
-                          //   // ဥပမာ - QR Code က အမြဲတမ်း ၁၂ လုံး ဖြစ်နေလျှင်
-                          //   if (value.length == 12) {
-                          //     _handleSearch(value);
-                          //     _controller.clear();
-                          //   }
-                          // },
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    // TODO: handle the entered value if needed
-                    collectPoints(
-                      widget.supabase,
-                      _controller.text,
-                      widget.vehical_no,
-                      widget.voc_no,
-                      widget.fuel_type,
-                      widget.amount.isNotEmpty ? double.tryParse(widget.amount) ?? 0 : 0,
-                      widget.sale_type,
-                    );
-                  },
-                  child: const Text('Collect'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-
-  //Porint Collection Void
-  Future<void> collectPoints(
-    SupabaseClient supabase,
-    String qrValue,
-    String vehicalNo,
-    String vocNo,
-    String fuelType,
-    double amount,
-    String saleType,
-  ) async {
     try {
-      if (amount > 0) {
-        try {
-          final res = await supabase.rpc(
-            'add_fuel_points',
-            params: {
-              'target_user_id': qrValue, // Customer UUID
-              'station_name': Config.config['database'],
-              'fuel_type': fuelType,
-              'amount_mmk': amount,
-              'v_voc_no': "${Config.config['database']}$vocNo",
-              'v_sale_type': saleType,
-            },
-          );
+      final double amountVal = double.tryParse(widget.amount) ?? 0;
 
-          print('response : ${res.toString()}');
-          if (res['status'] == 'success') {
-            print("Points added: ${res['points_added']}");
-            await supabase.from('notifications').insert({
-              'user_id': qrValue,
-              'title': 'Points Collected',
-              'message':
-                  'You have received ${res['points_added']} points for your recent purchase.',
-              'type': 'earn point',
-              'is_read': false,
-              'created_at': DateTime.now().toIso8601String(),
-            });
-            Navigator.of(context).pop(); // Dialog ပိတ်ရန်
-            showDialog(
-              context: context,
-              builder: (ctx) => AlertDialog(
-                title: Row(
-                  children: [
-                    TweenAnimationBuilder<double>(
-                      tween: Tween<double>(begin: 0.0, end: 1.0),
-                      duration: const Duration(milliseconds: 600),
-                      curve: Curves.elasticOut,
-                      builder: (context, scale, child) {
-                        return Transform.scale(
-                          scale: scale,
-                          child: Opacity(opacity: scale.clamp(0.0, 1.0), child: child),
-                        );
-                      },
-                      child: const Icon(Icons.check_circle_outline, color: Colors.green, size: 28),
-                    ),
-                    SizedBox(width: 8),
-                    Text('Success', style: TextStyle(fontWeight: FontWeight.bold)),
-                  ],
-                ),
-                content: Text(
-                  'Points ${res['points_added']} လက်ခံရရှိပါသည်။',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                    color: Colors.green.shade700,
-                  ),
-                ),
-                actions: [
-                  TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('OK')),
-                ],
-              ),
-            );
-          } else {
-            print("Error: ${res['message']}");
-            Navigator.of(context).pop(); // Dialog ပိတ်ရန်
-            showDialog(
-              context: context,
-              builder: (ctx) => AlertDialog(
-                title: const Row(
-                  children: [
-                    Icon(Icons.warning, color: Colors.amber),
-                    SizedBox(width: 8),
-                    Text('Warning', style: TextStyle(fontWeight: FontWeight.bold)),
-                  ],
-                ),
-                content: Text(res['message']?.toString() ?? 'Unknown error'),
-                actions: [
-                  TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('OK')),
-                ],
-              ),
-            );
-          }
+      // ၁။ Point ပေါင်းရန် RPC ခေါ်ခြင်း
+      final res = await widget.supabase.rpc(
+        'add_fuel_points',
+        params: {
+          'target_user_id': qrValue,
+          'station_name': Config.config['database'],
+          'fuel_type': widget.fuel_type,
+          'amount_mmk': amountVal,
+          'v_voc_no': "${Config.config['database']}${widget.voc_no}",
+          'v_sale_type': widget.sale_type,
+        },
+      );
 
-          if (res.status == 200) {
-            final data = res.data;
-            print("Points Collected Successfully: ${data['points']}");
-            // UI မှာ Success Message ပြရန်
-          } else {
-            print("Error: ${res.status} - ${res.data}");
-            Navigator.of(context).pop(); // Dialog ပိတ်ရန်
-          }
-        } on Exception catch (e) {
-          showDialog(
-            context: context,
-            builder: (ctx) => AlertDialog(
-              title: const Row(
-                children: [
-                  Icon(Icons.error, color: Colors.red),
-                  SizedBox(width: 8),
-                  Text('Error', style: TextStyle(fontWeight: FontWeight.bold)),
-                ],
-              ),
-              content: Text('${e.toString()} \n Invalide QR Data \nError Code : 22P02'),
-              actions: [
-                TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('OK')),
-              ],
-            ),
-          );
-        }
+      if (!mounted) return;
+
+      if (res['status'] == 'success') {
+        // ၂။ Success ဖြစ်မှ Dialog ကို ပိတ်မယ်
+        Navigator.of(context).pop();
+
+        // ၃။ အောင်မြင်ကြောင်း Success Message (Toast သို့မဟုတ် Dialog) ပြမယ်
+        _showSuccessFeedback(res['points_added'].toString());
+      } else {
+        // ၄။ Error ဖြစ်ရင် Dialog မပိတ်ဘဲ Error Message ပဲ ပြမယ်
+        setState(() {
+          _errorMessage = res['message']?.toString() ?? 'Something went wrong';
+          _isLoading = false; // Loading ရပ်မယ်
+        });
       }
-    } on FunctionException catch (e) {
-      print("Function Error: ${e.reasonPhrase} - ${e.details}");
     } catch (e) {
-      print("Unexpected Error: $e");
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = "ချိတ်ဆက်မှု လွဲချော်နေပါသည်။ QR မှန်ကန်မှု ရှိ၊ မရှိ စစ်ဆေးပါ။";
+        _isLoading = false;
+      });
     }
   }
 
-  void _handleSearch(String qrValue) {
-    print("Scanning Success: $qrValue");
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      icon: const Icon(Icons.qr_code_scanner, size: 32, color: Colors.green),
+      onPressed: () => _showScanDialog(),
+    );
+  }
 
-    // ဒီနေရာမှာ သင့်ရဲ့ _fetchSalesByQR(qrValue) စတဲ့ function တွေကို ခေါ်သုံးနိုင်ပါတယ်။
+  void _showScanDialog() {
+    _controller.clear();
+    _errorMessage = null;
+    _isLoading = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: !_isLoading, // Loading ဖြစ်နေရင် အပြင်နှိပ်ပြီး ပိတ်လို့မရအောင် တားမယ်
+      builder: (context) => StatefulBuilder(
+        // Dialog ထဲမှာ setState အလုပ်လုပ်အောင် သုံးရတယ်
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            title: const Text('Point ရယူရန် QR Scan ဖတ်ပါ'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildSaleInfoCard(),
+                  const SizedBox(height: 20),
+                  TextField(
+                    controller: _controller,
+                    autofocus: true,
+                    decoration: InputDecoration(
+                      labelText: 'Scan QR Code',
+                      errorText: _errorMessage, // Error ရှိရင် ဒီမှာ ပေါ်မယ်
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onSubmitted: (_) => _isLoading ? null : _handleCollectWithState(setDialogState),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: _isLoading ? null : () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: _isLoading ? null : () => _handleCollectWithState(setDialogState),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  fixedSize: const Size(120, 40),
+                ),
+                child: _isLoading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                      )
+                    : const Text('Collect', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  // Dialog ရဲ့ internal state ကို update လုပ်ဖို့ helper
+  Future<void> _handleCollectWithState(StateSetter setDialogState) async {
+    setDialogState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    await _handleCollect();
+    if (mounted)
+      setDialogState(() {
+        _isLoading = false;
+      });
+  }
+
+  Widget _buildSaleInfoCard() {
+    return Card(
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.grey.shade200), // Card ပတ်ပတ်လည် ဘောင်လေးခတ်မယ်
+      ),
+      color: Colors.grey.shade50, // နောက်ခံကို ခဲဖျော့လေးထားမယ်
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Sale Details',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.blueGrey),
+            ),
+            const Divider(height: 20, thickness: 1), // ခေါင်းစဉ်အောက်က မျဉ်းတားလေး
+
+            _infoRow('Voucher No', widget.voc_no),
+            const SizedBox(height: 8),
+
+            _infoRow('Vehicle No', widget.vehical_no.isEmpty ? '-' : widget.vehical_no),
+            const SizedBox(height: 8),
+
+            _infoRow('Fuel Type', widget.fuel_type),
+            const SizedBox(height: 8),
+
+            _infoRow(
+              'Sale Type',
+              widget.sale_type,
+              valueColor: _getSaleTypeColor(widget.sale_type),
+            ),
+            const SizedBox(height: 8),
+
+            _infoRow(
+              'Amount',
+              '${NumberFormat('#,###').format(double.tryParse(widget.amount) ?? 0)} MMK',
+              valueColor: Colors.green.shade700,
+              isBold: true,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // သားကြီးအတွက် Row လေးတွေကို စနစ်တကျ စီပေးမယ့် Helper Widget
+  Widget _infoRow(String label, String value, {Color? valueColor, bool isBold = false}) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Label အပိုင်း (Fixed width ပေးထားလို့ Colon တွေ ညီနေလိမ့်မယ်)
+        SizedBox(
+          width: 100,
+          child: Text(label, style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
+        ),
+        const Text(' :  ', style: TextStyle(color: Colors.grey)),
+        // Value အပိုင်း
+        Expanded(
+          child: Text(
+            value,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
+              color: valueColor ?? Colors.black87,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Sale Type အလိုက် အရောင်ခွဲပေးမယ့် logic
+  Color _getSaleTypeColor(String type) {
+    switch (type.toLowerCase()) {
+      case 'cash':
+        return Colors.blue.shade700;
+      case 'credit':
+        return Colors.orange.shade800;
+      case 'fleet':
+        return Colors.purple.shade700;
+      default:
+        return Colors.blueGrey;
+    }
+  }
+
+  void _showSuccessFeedback(String points) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text("Points $points Collect လုပ်ပြီးပါပြီ။"),
+        backgroundColor: Colors.green,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 }

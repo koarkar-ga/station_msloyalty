@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:station_msloyalty/Helper/InDevelopmentOverlay.dart';
 
 class SaleEntryScreen extends StatefulWidget {
   const SaleEntryScreen({super.key});
@@ -29,127 +30,133 @@ class _SaleEntryScreenState extends State<SaleEntryScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text("Sale Entry (ရောင်းရငွေစာရင်းသွင်းရန်)")),
-      body: Row(
+      body: Stack(
         children: [
-          // ၁။ ဘယ်ဘက်ခြမ်း - Entry Form
-          Expanded(
-            flex: 2,
-            child: Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: Card(
-                elevation: 4,
+          Row(
+            children: [
+              // ၁။ ဘယ်ဘက်ခြမ်း - Entry Form
+              Expanded(
+                flex: 2,
                 child: Padding(
-                  padding: const EdgeInsets.all(25.0),
+                  padding: const EdgeInsets.all(20.0),
+                  child: Card(
+                    elevation: 4,
+                    child: Padding(
+                      padding: const EdgeInsets.all(25.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            "အသေးစိတ်အချက်အလက်များ",
+                            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                          ),
+                          const Divider(),
+                          const SizedBox(height: 20),
+
+                          // Grade ရွေးရန်
+                          DropdownButtonFormField<String>(
+                            value: selectedGrade,
+                            decoration: const InputDecoration(labelText: "ဆီအမျိုးအစား (Grade)"),
+                            items: [
+                              '92 Ron',
+                              '95 Ron',
+                              'Premium Diesel',
+                              'Diesel',
+                            ].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+                            onChanged: (val) => setState(() => selectedGrade = val),
+                          ),
+
+                          const SizedBox(height: 20),
+
+                          // Liter ထည့်ရန်
+                          TextField(
+                            controller: _literController,
+                            decoration: const InputDecoration(
+                              labelText: "လီတာ (Liter)",
+                              border: OutlineInputBorder(),
+                            ),
+                            keyboardType: TextInputType.number,
+                            onChanged: _calculateAmount,
+                          ),
+
+                          const SizedBox(height: 20),
+
+                          // Amount ထည့်ရန်
+                          TextField(
+                            controller: _amountController,
+                            decoration: const InputDecoration(
+                              labelText: "ကျသင့်ငွေ (Amount)",
+                              border: OutlineInputBorder(),
+                            ),
+                            keyboardType: TextInputType.number,
+                            onChanged: _calculateLiter,
+                          ),
+
+                          const Spacer(),
+
+                          // သိမ်းမည့်ခလုတ်
+                          SizedBox(
+                            width: double.infinity,
+                            height: 55,
+                            child: ElevatedButton(
+                              onPressed: () {
+                                // သိမ်းမည့် Logic
+                              },
+                              style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                              child: const Text(
+                                "SAVE SALE RECORD",
+                                style: TextStyle(color: Colors.white, fontSize: 18),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              // ၂။ ညာဘက်ခြမ်း - Recent Sales List
+              Expanded(
+                flex: 3,
+                child: Container(
+                  color: Colors.grey[100],
+                  padding: const EdgeInsets.all(20),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        "အသေးစိတ်အချက်အလက်များ",
-                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                        "လတ်တလောရောင်းရမှုများ (Recent Sales)",
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                       ),
-                      const Divider(),
-                      const SizedBox(height: 20),
-
-                      // Grade ရွေးရန်
-                      DropdownButtonFormField<String>(
-                        value: selectedGrade,
-                        decoration: const InputDecoration(labelText: "ဆီအမျိုးအစား (Grade)"),
-                        items: [
-                          '92 Ron',
-                          '95 Ron',
-                          'Premium Diesel',
-                          'Diesel',
-                        ].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-                        onChanged: (val) => setState(() => selectedGrade = val),
-                      ),
-
-                      const SizedBox(height: 20),
-
-                      // Liter ထည့်ရန်
-                      TextField(
-                        controller: _literController,
-                        decoration: const InputDecoration(
-                          labelText: "လီတာ (Liter)",
-                          border: OutlineInputBorder(),
-                        ),
-                        keyboardType: TextInputType.number,
-                        onChanged: _calculateAmount,
-                      ),
-
-                      const SizedBox(height: 20),
-
-                      // Amount ထည့်ရန်
-                      TextField(
-                        controller: _amountController,
-                        decoration: const InputDecoration(
-                          labelText: "ကျသင့်ငွေ (Amount)",
-                          border: OutlineInputBorder(),
-                        ),
-                        keyboardType: TextInputType.number,
-                        onChanged: _calculateLiter,
-                      ),
-
-                      const Spacer(),
-
-                      // သိမ်းမည့်ခလုတ်
-                      SizedBox(
-                        width: double.infinity,
-                        height: 55,
-                        child: ElevatedButton(
-                          onPressed: () {
-                            // သိမ်းမည့် Logic
+                      const SizedBox(height: 10),
+                      Expanded(
+                        child: ListView.builder(
+                          itemCount: 5, // နမူနာ ၅ ခု
+                          itemBuilder: (context, index) {
+                            return Card(
+                              margin: const EdgeInsets.only(bottom: 10),
+                              child: ListTile(
+                                leading: const CircleAvatar(child: Icon(Icons.local_gas_station)),
+                                title: Text("92 Ron - 10.550 Liters"),
+                                subtitle: const Text("2024-05-20 10:30 AM"),
+                                trailing: const Text(
+                                  "26,375 MMK",
+                                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue),
+                                ),
+                              ),
+                            );
                           },
-                          style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                          child: const Text(
-                            "SAVE SALE RECORD",
-                            style: TextStyle(color: Colors.white, fontSize: 18),
-                          ),
                         ),
                       ),
                     ],
                   ),
                 ),
               ),
-            ),
+            ],
           ),
 
-          // ၂။ ညာဘက်ခြမ်း - Recent Sales List
-          Expanded(
-            flex: 3,
-            child: Container(
-              color: Colors.grey[100],
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    "လတ်တလောရောင်းရမှုများ (Recent Sales)",
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 10),
-                  Expanded(
-                    child: ListView.builder(
-                      itemCount: 5, // နမူနာ ၅ ခု
-                      itemBuilder: (context, index) {
-                        return Card(
-                          margin: const EdgeInsets.only(bottom: 10),
-                          child: ListTile(
-                            leading: const CircleAvatar(child: Icon(Icons.local_gas_station)),
-                            title: Text("92 Ron - 10.550 Liters"),
-                            subtitle: const Text("2024-05-20 10:30 AM"),
-                            trailing: const Text(
-                              "26,375 MMK",
-                              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+          inDevelopmentOverlay(),
         ],
       ),
     );

@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:station_msloyalty/AppConfig.dart';
+import 'package:station_msloyalty/SplashScreen.dart';
 import 'package:station_msloyalty/config.dart' as Config;
 import 'package:station_msloyalty/login_page.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -51,7 +52,7 @@ class _MyAppState extends State<MyApp> {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blueGrey),
         useMaterial3: true,
       ),
-      home: LoginPage(),
+      home: SplashScreen(),
     );
   }
 }

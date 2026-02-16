@@ -4,7 +4,7 @@ import 'package:station_msloyalty/ReportScreen.dart';
 import 'package:station_msloyalty/RewardPointScreen.dart';
 import 'package:station_msloyalty/SaleEntryScreen.dart';
 import 'package:station_msloyalty/SettingScreen.dart';
-import 'package:station_msloyalty/dashboard_page.dart';
+import 'package:station_msloyalty/DashboardScreen.dart';
 
 class AppLauncherScreen extends StatelessWidget {
   const AppLauncherScreen({super.key});
@@ -36,7 +36,7 @@ class AppLauncherScreen extends StatelessWidget {
                 color: Colors.blue,
                 onTap: () => Navigator.of(
                   context,
-                ).push(MaterialPageRoute(builder: (context) => const DashboardPage())),
+                ).push(MaterialPageRoute(builder: (context) => DashboardScreen())),
               ),
               _buildMenuButton(
                 context,
@@ -72,7 +72,7 @@ class AppLauncherScreen extends StatelessWidget {
                   // Reward Point Screen ဆီသွားမည့် Logic
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const RewardPointScreen()),
+                    MaterialPageRoute(builder: (context) => RewardPointScreen()),
                   );
                 },
               ),
@@ -83,7 +83,7 @@ class AppLauncherScreen extends StatelessWidget {
                 color: Colors.orange,
                 onTap: () => Navigator.of(
                   context,
-                ).push(MaterialPageRoute(builder: (context) => const ReportScreen())),
+                ).push(MaterialPageRoute(builder: (context) => const ReportsScreen())),
               ),
               _buildMenuButton(
                 context,

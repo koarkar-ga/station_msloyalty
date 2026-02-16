@@ -1,15 +1,17 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
-import 'dart:ui';
 
 import 'package:station_msloyalty/AppConfig.dart';
+import 'package:station_msloyalty/Services/ConnectionStatus.dart';
 
 class MsAppBar extends StatefulWidget {
-  const MsAppBar({super.key});
+  final String title;
+  const MsAppBar({super.key, this.title = 'Dashboard'});
 
   @override
   State<MsAppBar> createState() => _MsAppBarState();
@@ -18,6 +20,7 @@ class MsAppBar extends StatefulWidget {
 class _MsAppBarState extends State<MsAppBar> {
   // API Configurations
   // Windows Desktop တွင် local run ထားသော Node.js အတွက် localhost:3000 သုံးနိုင်သည်
+  final String apiHealthUrl = "${AppConfig.apiUrl}/api/health";
   final String apiUrl = "${AppConfig.apiUrl}/api/sales/recent";
   final String apiEhoSendCount = "${AppConfig.apiUrl}/api/eho/send-count";
 
@@ -30,7 +33,7 @@ class _MsAppBarState extends State<MsAppBar> {
   void initState() {
     super.initState();
     _timer = Timer.periodic(const Duration(seconds: 10), (timer) {
-      _checkConnection(context);
+      checkConnection(context, _isApiOnline);
       _ehoRemainingToSend();
     });
   }
@@ -74,35 +77,13 @@ class _MsAppBarState extends State<MsAppBar> {
     }
   }
 
-  // API Connection အခြေအနေကို စစ်ဆေးခြင်း
-  Future<void> _checkConnection(BuildContext context) async {
-    try {
-      final response = await http.get(Uri.parse(apiUrl)).timeout(const Duration(seconds: 15));
-      if (response.statusCode == 200) {
-        if (mounted) {
-          setState(() {
-            _isApiOnline = true;
-          });
-        }
-      }
-      print("API Status: ${response.statusCode}");
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isApiOnline = false;
-        });
-      }
-      print(e.toString());
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    return customizeAppBar(context: context);
+    return customizeAppBar(context: context, title: widget.title);
   }
 
   Widget customizeAppBar({
-    String title = "Station MS Loyalty Dashboard",
+    String title = "Station MS Loyalty > Dashboard",
     required BuildContext context,
   }) {
     return AppBar(
@@ -142,7 +123,7 @@ class _MsAppBarState extends State<MsAppBar> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text("ယနေ့ရက်စွဲ: ${DateFormat('dd-MM-yyyy').format(now)}"),
-                    Text("ယနေ့အချိန်: ${DateFormat('HH:mm:ss').format(now)}"),
+                    Text("ယနေ့အချိန်: ${DateFormat('hh:mm aa').format(now)}"),
                   ],
                 );
               },

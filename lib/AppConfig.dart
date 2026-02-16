@@ -11,6 +11,7 @@ class AppConfig {
   static String database = "M001";
   static String exportPath = "";
   static String apiUrl = "http://localhost:3000";
+  static String apiHealthUrl = "${AppConfig.apiUrl}/api/health";
 
   static Future<void> loadConfig() async {
     try {
@@ -36,6 +37,7 @@ class AppConfig {
         host = config.get("database", "server") ?? "localhost";
 
         apiUrl = config.get("api", "url") ?? "http://localhost:3000";
+        apiHealthUrl = "${AppConfig.apiUrl}/api/health";
 
         exportPath = "$exeDir/reports";
 

@@ -1,138 +1,100 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:station_msloyalty/Constants/constant.dart';
+import 'package:station_msloyalty/Helper/BuildRedemptionHistory.dart';
+import 'package:station_msloyalty/Helper/BuildRewardGridViewer.dart';
+import 'package:station_msloyalty/Helper/MsAppBar.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class RewardPointScreen extends StatefulWidget {
-  const RewardPointScreen({super.key});
-
   @override
-  State<RewardPointScreen> createState() => _RewardPointScreenState();
+  _RewardPointScreenState createState() => _RewardPointScreenState();
 }
 
 class _RewardPointScreenState extends State<RewardPointScreen> {
-  // နမူနာ Member Data
-  String memberName = "U Kyaw Kyaw";
-  int availablePoints = 5500;
+  final TextEditingController _qrController = TextEditingController();
+  final FocusNode _qrFocusNode = FocusNode();
+  bool _isLoading = true;
 
-  // နမူနာ Reward Items List
-  final List<Map<String, dynamic>> rewardItems = [
-    {
-      "name": "5000 MMK Fuel",
-      "points": 1000,
-      "icon": Icons.local_gas_station,
-      "color": Colors.orange,
-    },
-    {"name": "Engine Oil (1L)", "points": 5000, "icon": Icons.build, "color": Colors.blue},
-    {"name": "Umbrella", "points": 1500, "icon": Icons.umbrella, "color": Colors.red},
-    {"name": "Coffee Mug", "points": 800, "icon": Icons.coffee, "color": Colors.brown},
-  ];
+  // ၁။ Variable ကြေညာမယ်
+  bool _isManualInputEnabled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Screen ပွင့်တာနဲ့ QR ဖတ်ဖို့ အသင့်ဖြစ်အောင် Focus ပေးထားမယ်
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _qrFocusNode.requestFocus();
+    });
+    _toggleManualInput(_isManualInputEnabled);
+    // _loadSettings();
+  }
+
+  // Future<void> _loadSettings() async {
+  //   final prefs = await SharedPreferences.getInstance();
+  //   setState(() {
+  //     // သိမ်းထားတာမရှိရင် Default အနေနဲ့ false (Scanner only) ထားမယ်
+  //     _isManualInputEnabled = prefs.getBool('isManualInputEnabled') ?? false;
+  //   });
+  // }
+
+  // ၃။ သားကြီး ခေါ်ချင်တဲ့ _toggleManualInput Function
+  Future<void> _toggleManualInput(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('isManualInputEnabled', value);
+    setState(() {
+      _isManualInputEnabled = value;
+    });
+
+    // Feedback ပေးဖို့ (Optional)
+    _showSuccess(value ? "Manual Input Enabled" : "Manual Input Disabled");
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Reward Point Redemption (ပွိုင့်လဲလှယ်ရန်)")),
+      appBar: AppBar(
+        title: MsAppBar(title: "Redemptions"),
+        actions: [
+          ToggleButtons(
+            children: <Widget>[Icon(Icons.keyboard), Icon(Icons.qr_code_scanner_outlined)],
+            isSelected: [_isManualInputEnabled, !_isManualInputEnabled],
+            onPressed: (int index) {
+              _toggleManualInput(index == 0);
+              print("Manual Input: ${_isManualInputEnabled}");
+            },
+          ),
+        ],
+      ),
       body: Row(
         children: [
-          // ၁။ ဘယ်ဘက်ခြမ်း - Member Summary
+          // --- Left Panel: Reward Catalog (လဲလှယ်နိုင်သော ပစ္စည်းများ) ---
           Expanded(
-            flex: 1,
+            flex: 7,
             child: Container(
-              color: Colors.blueGrey[900],
-              padding: const EdgeInsets.all(30),
+              color: Colors.white,
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.stars, size: 80, color: Colors.yellow),
-                  const SizedBox(height: 20),
-                  Text(
-                    memberName,
-                    style: const TextStyle(
-                      fontSize: 24,
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  const Text("Your Available Points", style: TextStyle(color: Colors.white70)),
-                  const SizedBox(height: 5),
-                  Text(
-                    "$availablePoints",
-                    style: const TextStyle(
-                      fontSize: 48,
-                      color: Colors.yellow,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const Divider(color: Colors.white24, height: 40),
-                  const Text(
-                    "Redeem your points for gifts or fuel discounts!",
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.white54),
-                  ),
+                  _buildHeader("Reward Catalog"),
+                  Expanded(child: buildRewardGridView()), // Reward items list
+                  _buildQRScanButton(), // QR Input Section
                 ],
               ),
             ),
           ),
 
-          // ၂။ ညာဘက်ခြမ်း - Reward Items Selection
+          // --- Right Panel: Recent Redemptions (လဲလှယ်ပြီးသား မှတ်တမ်း) ---
           Expanded(
-            flex: 2,
-            child: Padding(
-              padding: const EdgeInsets.all(20.0),
+            flex: 3,
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.grey[50],
+                border: Border(left: BorderSide(color: Colors.grey[300]!)),
+              ),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    "ရရှိနိုင်သော လက်ဆောင်များ",
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 20),
-                  Expanded(
-                    child: GridView.builder(
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        childAspectRatio: 1.5,
-                        crossAxisSpacing: 15,
-                        mainAxisSpacing: 15,
-                      ),
-                      itemCount: rewardItems.length,
-                      itemBuilder: (context, index) {
-                        final item = rewardItems[index];
-                        bool canAfford = availablePoints >= item['points'];
-
-                        return Card(
-                          elevation: 3,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                          child: InkWell(
-                            onTap: canAfford ? () => _showRedeemConfirm(item) : null,
-                            child: Opacity(
-                              opacity: canAfford ? 1.0 : 0.5,
-                              child: Padding(
-                                padding: const EdgeInsets.all(15.0),
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(item['icon'], size: 40, color: item['color']),
-                                    const SizedBox(height: 10),
-                                    Text(
-                                      item['name'],
-                                      style: const TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 5),
-                                    Text(
-                                      "${item['points']} Points",
-                                      style: TextStyle(color: Colors.grey[700]),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
+                  _buildHeader("Recent Redemptions"),
+                  Expanded(child: buildRedemptionHistory()),
                 ],
               ),
             ),
@@ -142,25 +104,226 @@ class _RewardPointScreenState extends State<RewardPointScreen> {
     );
   }
 
-  // လဲလှယ်ရန် အတည်ပြုချက် Popup
-  void _showRedeemConfirm(Map item) {
+  // ၂။ QR Input Area (စာရိုက်လို့မရအောင် readOnly လုပ်ထားမယ်)
+  Widget _buildQRScanButton() {
+    return Padding(
+      padding: const EdgeInsets.all(20.0),
+      child: Align(
+        alignment: Alignment.bottomRight,
+        child: FloatingActionButton.extended(
+          onPressed: _showQRScannerDialog,
+          backgroundColor: Colors.teal,
+          icon: const Icon(Icons.qr_code_scanner, color: Colors.white),
+          label: const Text("Scan Reward QR", style: TextStyle(color: Colors.white)),
+        ),
+      ),
+    );
+  }
+
+  void _showQRScannerDialog() {
+    _qrController.clear();
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("Confirm Redemption"),
-        content: Text(
-          "Are you sure you want to exchange ${item['points']} points for ${item['name']}?",
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("CANCEL")),
-          ElevatedButton(
-            onPressed: () {
-              // ပွိုင့်လျှော့မည့် Logic များကို ဤနေရာတွင် ရေးရန်
-              Navigator.pop(context);
-            },
-            child: const Text("REDEEM NOW"),
+      barrierDismissible: false,
+      builder: (context) {
+        // Focus ကို ပေးထားမြဲဖြစ်ရမယ် (Scanner အတွက်)
+        Future.delayed(Duration.zero, () => _qrFocusNode.requestFocus());
+
+        return AlertDialog(
+          backgroundColor: Colors.blueGrey[900],
+          title: Row(
+            children: [
+              const Icon(Icons.qr_code_scanner, color: Colors.blue),
+              const SizedBox(width: 10),
+              const Text("Scan Reward QR", style: TextStyle(color: Colors.white, fontSize: 16)),
+            ],
           ),
-        ],
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Settings မှာ On ထားရင် TextField ကို ပြမယ်၊ Off ထားရင် ဝှက်ထားမယ်
+              _isManualInputEnabled
+                  ? TextField(
+                      controller: _qrController,
+                      focusNode: _qrFocusNode,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: const InputDecoration(
+                        labelText: "Enter QR Code Manually",
+                        labelStyle: TextStyle(color: Colors.white70),
+                        enabledBorder: UnderlineInputBorder(
+                          borderSide: BorderSide(color: Colors.blue),
+                        ),
+                      ),
+                      onSubmitted: (value) {
+                        if (value.isNotEmpty) {
+                          Navigator.pop(context);
+                          _processRedemption(value);
+                        }
+                      },
+                    )
+                  : Opacity(
+                      opacity: 0,
+                      child: SizedBox(
+                        height: 1,
+                        width: 1,
+                        child: TextField(
+                          controller: _qrController,
+                          focusNode: _qrFocusNode,
+                          onChanged: (value) {
+                            if (value.isNotEmpty) {
+                              Navigator.pop(context);
+                              _processRedemption(value);
+                            }
+                          },
+                        ),
+                      ),
+                    ),
+
+              !_isManualInputEnabled
+                  ? const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 20),
+                      child: Row(
+                        children: [
+                          Icon(Icons.qr_code_scanner_rounded, color: Colors.white),
+                          Text("Please use your QR Scanner", style: TextStyle(color: Colors.white)),
+                        ],
+                      ),
+                    )
+                  : const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 20),
+                      child: Row(
+                        children: [
+                          Icon(Icons.keyboard, color: Colors.white),
+                          Text("Please use your Keyboard", style: TextStyle(color: Colors.white)),
+                        ],
+                      ),
+                    ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Cancel", style: TextStyle(color: Colors.redAccent)),
+            ),
+            // Manual ဖွင့်ထားရင် Submit button လေး ထည့်ပေးမယ်
+            if (_isManualInputEnabled)
+              ElevatedButton(
+                onPressed: () {
+                  if (_qrController.text.isNotEmpty) {
+                    Navigator.pop(context);
+                    _processRedemption(_qrController.text);
+                  }
+                },
+                child: const Text("Submit"),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> redeemReward(String userId, int rewardId) async {
+    try {
+      // RPC ကို ခေါ်လိုက်တာနဲ့ Point နှုတ်တာရော History သွင်းတာရော တစ်ခါတည်း ပြီးမယ်
+      await Supabase.instance.client.rpc(
+        'process_reward_redemption',
+        params: {'target_user_id': userId, 'target_reward_id': rewardId},
+      );
+
+      _showSuccess("Redemption Successful!");
+    } catch (e) {
+      _showError("Failed to redeem: $e");
+    }
+  }
+
+  // Error ပြရန်
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        width: 300,
+        content: Row(
+          children: [
+            const Icon(Icons.error_outline, color: Colors.white),
+            const SizedBox(width: 10),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        backgroundColor: Colors.redAccent,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  // Success ပြရန်
+  void _showSuccess(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle_outline, color: Colors.white),
+            const SizedBox(width: 10),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        backgroundColor: Colors.green,
+        behavior: SnackBarBehavior.floating,
+        width: 300,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  // ၃။ QR Data ကို ခွဲထုတ်ပြီး တိုက်စစ်မည့် Logic
+  void _processRedemption(String qrData) async {
+    try {
+      // data format: user123|reward1|1708098335
+      List<String> parts = qrData.split('|');
+      if (parts.length != 3) throw "Invalid QR Format";
+
+      String userId = parts[0];
+      int rewardId = int.parse(parts[1]);
+      int qrTimestamp = int.parse(parts[2]);
+
+      // ၁။ အချိန်စစ်မယ် (ဥပမာ- ၅ မိနစ်ထက် ကျော်နေရင် Expired)
+      int currentTimestamp = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+      if ((currentTimestamp - qrTimestamp) > 300) {
+        _showError("QR Code သက်တမ်းကုန်ဆုံးသွားပါပြီ (Expired)");
+        return;
+      }
+
+      // ၂။ Database မှာ တိုက်စစ်မယ်
+      // Node.js API ဆီ လှမ်းပို့ပြီး point လောက်မလောက်နဲ့ redeem လုပ်မယ့် logic ခေါ်ပါ
+      redeemReward(userId, rewardId);
+    } catch (e) {
+      _showError("စနစ်ချို့ယွင်းချက်: $e");
+    } finally {
+      _qrController.clear();
+      _qrFocusNode.requestFocus();
+    }
+  }
+
+  // UI Components (Headers)
+  Widget _buildHeader(String title) {
+    return Container(
+      padding: const EdgeInsets.all(15),
+      alignment: Alignment.centerLeft,
+      child: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+    );
+  }
+
+  // Left Side Reward List Builder
+  Widget _buildRewardList() {
+    return ListView.builder(
+      itemCount: 10,
+      itemBuilder: (context, index) => ListTile(
+        leading: Icon(Icons.card_giftcard, color: Colors.orange),
+        title: Text("Reward Item $index"),
+        subtitle: Text("Required: ${500 + (index * 100)} Points"),
+        trailing: Icon(Icons.arrow_forward_ios, size: 14),
       ),
     );
   }

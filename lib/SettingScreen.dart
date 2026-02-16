@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:station_msloyalty/Helper/InDevelopmentOverlay.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -14,48 +15,53 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text("App Settings")),
-      body: Row(
+      body: Stack(
         children: [
-          // ၁။ ဘယ်ဘက်ခြမ်း - Navigation Rail (Settings Categories)
-          NavigationRail(
-            selectedIndex: _selectedIndex,
-            onDestinationSelected: (int index) {
-              setState(() {
-                _selectedIndex = index;
-              });
-            },
-            labelType: NavigationRailLabelType.all,
-            destinations: const [
-              NavigationRailDestination(
-                icon: Icon(Icons.local_gas_station_outlined),
-                selectedIcon: Icon(Icons.local_gas_station),
-                label: Text('Fuel Prices'),
+          Row(
+            children: [
+              // ၁။ ဘယ်ဘက်ခြမ်း - Navigation Rail (Settings Categories)
+              NavigationRail(
+                selectedIndex: _selectedIndex,
+                onDestinationSelected: (int index) {
+                  setState(() {
+                    _selectedIndex = index;
+                  });
+                },
+                labelType: NavigationRailLabelType.all,
+                destinations: const [
+                  NavigationRailDestination(
+                    icon: Icon(Icons.local_gas_station_outlined),
+                    selectedIcon: Icon(Icons.local_gas_station),
+                    label: Text('Fuel Prices'),
+                  ),
+                  NavigationRailDestination(
+                    icon: Icon(Icons.print_outlined),
+                    selectedIcon: Icon(Icons.print),
+                    label: Text('Printer'),
+                  ),
+                  NavigationRailDestination(
+                    icon: Icon(Icons.person_outline),
+                    selectedIcon: Icon(Icons.person),
+                    label: Text('Account'),
+                  ),
+                ],
               ),
-              NavigationRailDestination(
-                icon: Icon(Icons.print_outlined),
-                selectedIcon: Icon(Icons.print),
-                label: Text('Printer'),
-              ),
-              NavigationRailDestination(
-                icon: Icon(Icons.person_outline),
-                selectedIcon: Icon(Icons.person),
-                label: Text('Account'),
+              const VerticalDivider(thickness: 1, width: 1),
+
+              // ၂။ ညာဘက်ခြမ်း - Settings Content
+              Expanded(
+                child: IndexedStack(
+                  index: _selectedIndex,
+                  children: [
+                    _buildFuelPriceSettings(),
+                    _buildPrinterSettings(),
+                    _buildAccountSettings(),
+                  ],
+                ),
               ),
             ],
           ),
-          const VerticalDivider(thickness: 1, width: 1),
-
-          // ၂။ ညာဘက်ခြမ်း - Settings Content
-          Expanded(
-            child: IndexedStack(
-              index: _selectedIndex,
-              children: [
-                _buildFuelPriceSettings(),
-                _buildPrinterSettings(),
-                _buildAccountSettings(),
-              ],
-            ),
-          ),
+          inDevelopmentOverlay(),
         ],
       ),
     );
