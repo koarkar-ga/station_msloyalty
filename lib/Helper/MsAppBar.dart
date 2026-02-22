@@ -32,8 +32,8 @@ class _MsAppBarState extends State<MsAppBar> {
   @override
   void initState() {
     super.initState();
-    _timer = Timer.periodic(const Duration(seconds: 10), (timer) {
-      checkConnection(context, _isApiOnline);
+    _timer = Timer.periodic(const Duration(seconds: 3), (timer) {
+      checkApiConnection();
       _ehoRemainingToSend();
     });
   }
@@ -42,6 +42,31 @@ class _MsAppBarState extends State<MsAppBar> {
   void dispose() {
     super.dispose();
     _timer?.cancel();
+  }
+
+  Future<bool> checkApiConnection() async {
+    try {
+      final response = await http
+          .get(Uri.parse(AppConfig.apiHealthUrl))
+          .timeout(const Duration(seconds: 3));
+      if (response.statusCode == 200) {
+        print(response.body);
+        if (mounted) {
+          setState(() {
+            _isApiOnline = true;
+          });
+        }
+      }
+      print("API Status: ${response.statusCode}");
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isApiOnline = false;
+        });
+      }
+      print(e.toString());
+    }
+    return _isApiOnline;
   }
 
   // EHO Reaming to send count

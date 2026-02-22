@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:station_msloyalty/config.dart' as Config;
@@ -44,45 +46,69 @@ class _TextFieldDialogState extends State<TextFieldDialog> {
     }
 
     setState(() {
-      _isLoading = true; // Loading စပြမယ်
-      _errorMessage = null; // Error အဟောင်းရှိရင် ရှင်းမယ်
+      _isLoading = true;
+      _errorMessage = null;
     });
 
     try {
+      // ၁။ JSON String ကို Parse လုပ်မယ်
+      Map<String, dynamic> qrData;
+      try {
+        qrData = jsonDecode(qrValue);
+      } catch (e) {
+        throw "QR ပုံစံ မှားယွင်းနေပါသည်";
+      }
+
+      final String targetUid = qrData['uid'] ?? '';
+      final int qrTimestamp = qrData['t'] ?? 0;
+      final String qrHash = qrData['h'] ?? '';
+
+      // ၂။ Timestamp စစ်ဆေးခြင်း (၃၀ စက္ကန့်အတွင်း ဟုတ်မဟုတ်)
+      final int currentMs = DateTime.now().millisecondsSinceEpoch;
+      // ကွာခြားချက်ကို စက္ကန့်အဖြစ် ပြောင်းမယ် (abs() က အနှုတ်မထွက်အောင်)
+      final int diffInSeconds = ((currentMs - qrTimestamp).abs() / 1000).round();
+
+      if (diffInSeconds > 30) {
+        setState(() {
+          _errorMessage = "QR Code သက်တမ်းကုန်ဆုံးသွားပါပြီ (Expired)";
+          _isLoading = false;
+        });
+        return;
+      }
+
       final double amountVal = double.tryParse(widget.amount) ?? 0;
 
-      // ၁။ Point ပေါင်းရန် RPC ခေါ်ခြင်း
+      // ၃။ Point ပေါင်းရန် RPC ခေါ်ခြင်း (UID နဲ့ Hash ကို ပို့မယ်)
       final res = await widget.supabase.rpc(
         'add_fuel_points',
         params: {
-          'target_user_id': qrValue,
+          'target_user_id': targetUid, // JSON ထဲက UID ကို သုံးမယ်
           'station_name': Config.config['database'],
           'fuel_type': widget.fuel_type,
           'amount_mmk': amountVal,
           'v_voc_no': "${Config.config['database']}${widget.voc_no}",
           'v_sale_type': widget.sale_type,
+          //'qr_hash': qrHash, // Hash ကိုလည်း Server ဘက်မှာ စစ်ဖို့ ပို့ပေးလိုက်မယ်
         },
       );
 
       if (!mounted) return;
 
       if (res['status'] == 'success') {
-        // ၂။ Success ဖြစ်မှ Dialog ကို ပိတ်မယ်
         Navigator.of(context).pop();
-
-        // ၃။ အောင်မြင်ကြောင်း Success Message (Toast သို့မဟုတ် Dialog) ပြမယ်
         _showSuccessFeedback(res['points_added'].toString());
       } else {
-        // ၄။ Error ဖြစ်ရင် Dialog မပိတ်ဘဲ Error Message ပဲ ပြမယ်
         setState(() {
           _errorMessage = res['message']?.toString() ?? 'Something went wrong';
-          _isLoading = false; // Loading ရပ်မယ်
+          _isLoading = false;
         });
       }
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _errorMessage = "ချိတ်ဆက်မှု လွဲချော်နေပါသည်။ QR မှန်ကန်မှု ရှိ၊ မရှိ စစ်ဆေးပါ။";
+        _errorMessage = e.toString().contains("QR ပုံစံ")
+            ? e.toString()
+            : "ချိတ်ဆက်မှု လွဲချော်နေပါသည်။ QR မှန်ကန်မှု ရှိ၊ မရှိ စစ်ဆေးပါ။ \n ${e.toString()}";
         _isLoading = false;
       });
     }
