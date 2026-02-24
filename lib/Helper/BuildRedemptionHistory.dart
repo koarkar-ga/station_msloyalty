@@ -1,5 +1,6 @@
 // Right Side History Builder
 import 'package:flutter/material.dart';
+import 'package:station_msloyalty/AppConfig.dart';
 import 'package:station_msloyalty/Constants/constant.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -9,6 +10,7 @@ Widget buildRedemptionHistory() {
     stream: Supabase.instance.client
         .from('redemption_history')
         .stream(primaryKey: ['id'])
+        .eq('station_id', AppConfig.stationId)
         .order('created_at', ascending: false) // အသစ်ဆုံးကို အပေါ်ထားမယ်
         .limit(10),
     builder: (context, snapshot) {

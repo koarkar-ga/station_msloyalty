@@ -125,7 +125,7 @@ class _SplashScreenState extends State<SplashScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const FlutterLogo(size: 100), // သားကြီးတို့ ဆိုင် Logo ထည့်ရန်
+            Image.asset("assets/images/moonsun_logo.png", width: 100, height: 100),
             const SizedBox(height: 30),
             const CircularProgressIndicator(),
             const SizedBox(height: 20),

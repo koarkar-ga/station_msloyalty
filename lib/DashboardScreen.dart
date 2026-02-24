@@ -52,20 +52,20 @@ class DashboardScreen extends StatelessWidget {
                   print("Issued Points Data: $issuedPointsData");
                   return Row(
                     children: [
-                      _buildStatCard(
-                        "Total Sale Amount",
-                        "${formatter.format(saleData['totalAmount'])} Ks",
-                        Icons.money,
-                        Colors.green,
-                      ),
+                      // _buildStatCard(
+                      //   "Total Sale Amount",
+                      //   "${formatter.format(saleData['totalAmount'])} Ks",
+                      //   Icons.money,
+                      //   Colors.green,
+                      // ),
 
-                      const SizedBox(width: 15),
-                      _buildStatCard(
-                        "Total Sale Liter",
-                        "${formatter.format(saleData['totalLiter'])} Lit",
-                        Icons.water_drop_outlined,
-                        Colors.grey,
-                      ),
+                      // const SizedBox(width: 15),
+                      // _buildStatCard(
+                      //   "Total Sale Liter",
+                      //   "${formatter.format(saleData['totalLiter'])} Lit",
+                      //   Icons.water_drop_outlined,
+                      //   Colors.grey,
+                      // ),
                       const SizedBox(width: 15),
                       _buildStatCard(
                         "Total Rewards",

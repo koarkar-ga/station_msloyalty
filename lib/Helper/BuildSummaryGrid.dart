@@ -20,10 +20,10 @@ Widget buildSummaryGrid() {
     padding: const EdgeInsets.all(20),
     children: [
       // ၁။ Sale Type Summary (From Node.js API)
-      _buildFutureChart("Sale Type Summary", _getSaleTypeData()),
+      // _buildFutureChart("Sale Type Summary", _getSaleTypeData()),
 
       // ၂။ Fuel Sale Summary (From Node.js API)
-      _buildFutureChart("Fuel Sale Summary", _getFuelSaleData()),
+      // _buildFutureChart("Fuel Sale Summary", _getFuelSaleData()),
 
       // ၄။ Redemption Summary (From Supabase)
       _buildFutureChart("Redemption Summary", _getRedemptionData()),

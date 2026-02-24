@@ -38,15 +38,15 @@ class AppLauncherScreen extends StatelessWidget {
                   context,
                 ).push(MaterialPageRoute(builder: (context) => DashboardScreen())),
               ),
-              _buildMenuButton(
-                context,
-                icon: Icons.local_gas_station,
-                label: "Sale Entry",
-                color: Colors.green,
-                onTap: () => Navigator.of(
-                  context,
-                ).push(MaterialPageRoute(builder: (context) => const SaleEntryScreen())),
-              ),
+              // _buildMenuButton(
+              //   context,
+              //   icon: Icons.local_gas_station,
+              //   label: "Sale Entry",
+              //   color: Colors.green,
+              //   onTap: () => Navigator.of(
+              //     context,
+              //   ).push(MaterialPageRoute(builder: (context) => const SaleEntryScreen())),
+              // ),
 
               // ... GridView ရဲ့ children ထဲမှာ ဒါလေးတွေ ထပ်ဖြည့်ပါ ...
               _buildMenuButton(

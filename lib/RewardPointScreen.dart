@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:station_msloyalty/Constants/constant.dart';
+import 'package:station_msloyalty/Helper/BuildQrView.dart';
 import 'package:station_msloyalty/Helper/BuildRedemptionHistory.dart';
 import 'package:station_msloyalty/Helper/BuildRewardGridViewer.dart';
 import 'package:station_msloyalty/Helper/MsAppBar.dart';
@@ -11,8 +12,9 @@ class RewardPointScreen extends StatefulWidget {
   _RewardPointScreenState createState() => _RewardPointScreenState();
 }
 
-class _RewardPointScreenState extends State<RewardPointScreen> {
+class _RewardPointScreenState extends State<RewardPointScreen> with SingleTickerProviderStateMixin {
   final TextEditingController _qrController = TextEditingController();
+  late AnimationController _animationController;
   final FocusNode _qrFocusNode = FocusNode();
   bool _isLoading = true;
 
@@ -26,8 +28,16 @@ class _RewardPointScreenState extends State<RewardPointScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _qrFocusNode.requestFocus();
     });
+    _animationController = AnimationController(vsync: this, duration: const Duration(seconds: 1))
+      ..repeat(reverse: true);
     _toggleManualInput(_isManualInputEnabled);
     // _loadSettings();
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
   }
 
   // Future<void> _loadSettings() async {
@@ -142,6 +152,24 @@ class _RewardPointScreenState extends State<RewardPointScreen> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              Stack(
+                alignment: Alignment.center,
+                children: [
+                  Positioned(
+                    top: 100,
+                    child: Icon(Icons.qr_code_scanner, color: Colors.white, size: 52),
+                  ),
+                  SizedBox(width: 8),
+                  Positioned(
+                    top: 160,
+                    child: Text(
+                      "QR Code ကို Scan ဖတ်ပါ",
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  buildQRView(_animationController),
+                ],
+              ),
               // Settings မှာ On ထားရင် TextField ကို ပြမယ်၊ Off ထားရင် ဝှက်ထားမယ်
               _isManualInputEnabled
                   ? TextField(

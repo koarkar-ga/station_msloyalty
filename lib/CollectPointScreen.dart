@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:station_msloyalty/AppConfig.dart';
@@ -23,11 +25,17 @@ class CollectPointScreen extends StatefulWidget {
 
 class _CollectPointScreenState extends State<CollectPointScreen> {
   List<dynamic> localDataList = [];
+  //late Timer? _timer;
 
   @override
   void initState() {
     super.initState();
     fetchPointSales();
+  }
+
+  dispose() {
+    //_timer?.cancel();
+    super.dispose();
   }
 
   Future<void> fetchPointSales() async {
@@ -214,7 +222,10 @@ class _CollectPointScreenState extends State<CollectPointScreen> {
           Expanded(
             child: Align(
               alignment: Alignment.center,
-              child: sale['Sale_Type_name'] == 'Cash Sale' || sale['Sale_Type_name'] == 'ePayment'
+              child:
+                  sale['Sale_Type_name'] == 'Cash Sale' ||
+                      sale['Sale_Type_name'] == 'ePayment' ||
+                      sale['Sale_Type_name'] == 'Credit Sale'
                   ? CheckAlreadyCollected(sale: sale)
                   : IconButton(
                       style: ButtonStyle(),

@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:station_msloyalty/Helper/BuildQrView.dart';
 import 'package:station_msloyalty/config.dart' as Config;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -27,14 +28,24 @@ class TextFieldDialog extends StatefulWidget {
   _TextFieldDialogState createState() => _TextFieldDialogState();
 }
 
-class _TextFieldDialogState extends State<TextFieldDialog> {
+class _TextFieldDialogState extends State<TextFieldDialog> with SingleTickerProviderStateMixin {
   final TextEditingController _controller = TextEditingController();
+  late AnimationController _animationController;
   bool _isLoading = false; // Loading status ကို ထိန်းချုပ်ရန်
   String? _errorMessage; // Error message ကို UI မှာ ပြရန်
+  final FocusNode _focusNode = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(vsync: this, duration: const Duration(seconds: 1))
+      ..repeat(reverse: true);
+  }
 
   @override
   void dispose() {
     _controller.dispose();
+    _animationController.dispose(); // Memory မစားအောင် ပြန်ပိတ်မယ်
     super.dispose();
   }
 
@@ -71,6 +82,7 @@ class _TextFieldDialogState extends State<TextFieldDialog> {
       if (diffInSeconds > 30) {
         setState(() {
           _errorMessage = "QR Code သက်တမ်းကုန်ဆုံးသွားပါပြီ (Expired)";
+          _controller.clear();
           _isLoading = false;
         });
         return;
@@ -134,46 +146,66 @@ class _TextFieldDialogState extends State<TextFieldDialog> {
         // Dialog ထဲမှာ setState အလုပ်လုပ်အောင် သုံးရတယ်
         builder: (context, setDialogState) {
           return AlertDialog(
-            title: const Text('Point ရယူရန် QR Scan ဖတ်ပါ'),
+            backgroundColor: Colors.blueGrey[900],
+            title: const Text(
+              'Point ရယူရန် QR Scan ဖတ်ပါ',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+            ),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   _buildSaleInfoCard(),
                   const SizedBox(height: 20),
-                  TextField(
-                    controller: _controller,
-                    autofocus: true,
-                    decoration: InputDecoration(
-                      labelText: 'Scan QR Code',
-                      errorText: _errorMessage, // Error ရှိရင် ဒီမှာ ပေါ်မယ်
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  Opacity(
+                    opacity: 1,
+                    child: SizedBox(
+                      width: 100,
+                      height: 0,
+                      child: TextField(
+                        focusNode: _focusNode,
+                        enabled: true,
+                        showCursor: false,
+                        controller: _controller,
+                        maxLines: 1,
+                        keyboardType: TextInputType.none,
+                        onTapOutside: (event) => !_isLoading ? _focusNode.requestFocus() : null,
+                        style: TextStyle(overflow: TextOverflow.fade),
+                        autofocus: true,
+                        decoration: InputDecoration(
+                          labelText: 'Scan QR Code',
+                          errorText: _errorMessage, // Error ရှိရင် ဒီမှာ ပေါ်မယ်
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onEditingComplete: () =>
+                            _isLoading ? null : _handleCollectWithState(setDialogState),
+                        onSubmitted: (_) =>
+                            _isLoading ? null : _handleCollectWithState(setDialogState),
+                      ),
                     ),
-                    onSubmitted: (_) => _isLoading ? null : _handleCollectWithState(setDialogState),
+                  ),
+                  Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Positioned(
+                        top: 100,
+                        child: Icon(Icons.qr_code_scanner, color: Colors.white, size: 52),
+                      ),
+                      SizedBox(width: 8),
+                      Positioned(
+                        top: 160,
+                        child: Text(
+                          "QR Code ကို Scan ဖတ်ပါ",
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      buildQRView(_animationController),
+                      Text(_errorMessage ?? '', style: TextStyle(color: Colors.red)),
+                    ],
                   ),
                 ],
               ),
             ),
-            actions: [
-              TextButton(
-                onPressed: _isLoading ? null : () => Navigator.pop(context),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                onPressed: _isLoading ? null : () => _handleCollectWithState(setDialogState),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
-                  fixedSize: const Size(120, 40),
-                ),
-                child: _isLoading
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                      )
-                    : const Text('Collect', style: TextStyle(color: Colors.white)),
-              ),
-            ],
           );
         },
       ),
