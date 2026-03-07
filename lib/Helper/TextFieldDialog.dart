@@ -74,12 +74,12 @@ class _TextFieldDialogState extends State<TextFieldDialog> with SingleTickerProv
       final int qrTimestamp = qrData['t'] ?? 0;
       final String qrHash = qrData['h'] ?? '';
 
-      // ၂။ Timestamp စစ်ဆေးခြင်း (၃၀ စက္ကန့်အတွင်း ဟုတ်မဟုတ်)
+      // ၂။ Timestamp စစ်ဆေးခြင်း (၅ မိနစ် / ၃၀၀ စက္ကန့်အတွင်း ဟုတ်မဟုတ်)
       final int currentMs = DateTime.now().millisecondsSinceEpoch;
       // ကွာခြားချက်ကို စက္ကန့်အဖြစ် ပြောင်းမယ် (abs() က အနှုတ်မထွက်အောင်)
       final int diffInSeconds = ((currentMs - qrTimestamp).abs() / 1000).round();
 
-      if (diffInSeconds > 30) {
+      if (diffInSeconds > 300) {
         setState(() {
           _errorMessage = "QR Code သက်တမ်းကုန်ဆုံးသွားပါပြီ (Expired)";
           _controller.clear();
@@ -95,7 +95,7 @@ class _TextFieldDialogState extends State<TextFieldDialog> with SingleTickerProv
         'add_fuel_points',
         params: {
           'target_user_id': targetUid, // JSON ထဲက UID ကို သုံးမယ်
-          'station_name': Config.config['database'],
+          'station_id': Config.config['database'],
           'fuel_type': widget.fuel_type,
           'amount_mmk': amountVal,
           'v_voc_no': "${Config.config['database']}${widget.voc_no}",
@@ -195,7 +195,7 @@ class _TextFieldDialogState extends State<TextFieldDialog> with SingleTickerProv
                       Positioned(
                         top: 160,
                         child: Text(
-                          "QR Code ကို Scan ဖတ်ပါ",
+                          "QR Code ကို QR Scanner ဖြင့် Scan ဖတ်ပါ",
                           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                         ),
                       ),

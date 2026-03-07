@@ -43,8 +43,12 @@ dependencies:
   path:
   ini:
   bot_toast: ^4.1.3
-  shared_preferences: 
-  fl_chart:
+  shared_preferences: ^2.2.0
+  fl_chart: ^0.66.0
+  camera: ^0.11.0+2
+  camera_windows: ^0.2.1
+  zxing_lib: ^1.1.4
+  image: ^4.1.0
 
 dev_dependencies:
   flutter_test:

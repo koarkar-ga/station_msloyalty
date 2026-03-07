@@ -15,6 +15,8 @@ import 'package:station_msloyalty/Model/SaleLoadStatus.dart';
 import 'package:station_msloyalty/Model/SaleTypeModel.dart';
 import 'package:station_msloyalty/Services/CheckVocNoExists.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:station_msloyalty/Helper/CameraScannerDialog.dart';
 
 class CollectPointScreen extends StatefulWidget {
   const CollectPointScreen({super.key});
@@ -253,6 +255,20 @@ class CheckAlreadyCollected extends StatefulWidget {
 //Check Already Collected Point
 class _CheckAlreadyCollectedState extends State<CheckAlreadyCollected> {
   final supabase = Supabase.instance.client;
+  bool _useCameraScanner = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _useCameraScanner = prefs.getBool('use_camera_scanner') ?? false;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -278,15 +294,25 @@ class _CheckAlreadyCollectedState extends State<CheckAlreadyCollected> {
           }
 
           // ၃။ Not Collected Yet (Button/Dialog ပြမယ်)
-          // ဒီမှာ မူလ QR icon ပုံစံလေး ပြထားရင် ပုံ (image_5fc740.png) ထဲကအတိုင်း ပိုလှမယ်
-          return TextFieldDialog(
-            supabase: supabase,
-            voc_no: widget.sale['VocNo'],
-            vehical_no: widget.sale['Vehical_No'] ?? '',
-            fuel_type: widget.sale['FuelTypeName'] ?? '',
-            amount: widget.sale['TotalPrice']?.toString() ?? '0',
-            sale_type: widget.sale['Sale_Type_name'] ?? '',
-          );
+          if (_useCameraScanner) {
+            return CameraScannerDialog(
+              supabase: supabase,
+              vocNo: widget.sale['VocNo'],
+              vehicalNo: widget.sale['Vehical_No'] ?? '',
+              fuelType: widget.sale['FuelTypeName'] ?? '',
+              amount: widget.sale['TotalPrice']?.toString() ?? '0',
+              saleType: widget.sale['Sale_Type_name'] ?? '',
+            );
+          } else {
+            return TextFieldDialog(
+              supabase: supabase,
+              voc_no: widget.sale['VocNo'],
+              vehical_no: widget.sale['Vehical_No'] ?? '',
+              fuel_type: widget.sale['FuelTypeName'] ?? '',
+              amount: widget.sale['TotalPrice']?.toString() ?? '0',
+              sale_type: widget.sale['Sale_Type_name'] ?? '',
+            );
+          }
         },
       ),
     );

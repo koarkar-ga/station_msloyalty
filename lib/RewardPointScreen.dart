@@ -316,7 +316,7 @@ class _RewardPointScreenState extends State<RewardPointScreen> with SingleTicker
       int rewardId = int.parse(parts[1]);
       int qrTimestamp = int.parse(parts[2]);
 
-      // ၁။ အချိန်စစ်မယ် (ဥပမာ- ၅ မိနစ်ထက် ကျော်နေရင် Expired)
+      // ၁။ အချိန်စစ်မယ် (၅ မိနစ်ထက် ကျော်နေရင် Expired)
       int currentTimestamp = DateTime.now().millisecondsSinceEpoch ~/ 1000;
       if ((currentTimestamp - qrTimestamp) > 300) {
         _showError("QR Code သက်တမ်းကုန်ဆုံးသွားပါပြီ (Expired)");

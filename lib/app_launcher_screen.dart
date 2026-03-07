@@ -5,6 +5,8 @@ import 'package:station_msloyalty/RewardPointScreen.dart';
 import 'package:station_msloyalty/SaleEntryScreen.dart';
 import 'package:station_msloyalty/SettingScreen.dart';
 import 'package:station_msloyalty/DashboardScreen.dart';
+import 'package:station_msloyalty/LoyaltyReportScreen.dart';
+
 
 class AppLauncherScreen extends StatelessWidget {
   const AppLauncherScreen({super.key});
@@ -84,6 +86,18 @@ class AppLauncherScreen extends StatelessWidget {
                 onTap: () => Navigator.of(
                   context,
                 ).push(MaterialPageRoute(builder: (context) => const ReportsScreen())),
+              ),
+              _buildMenuButton(
+                context,
+                icon: Icons.pie_chart_rounded, // Loyalty Reports Icon
+                label: "Loyalty Reports",
+                color: Colors.teal,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const LoyaltyReportScreen()),
+                  );
+                },
               ),
               _buildMenuButton(
                 context,

@@ -73,9 +73,14 @@ Widget _buildGiftCardItem(GiftCard card) {
               Text(
                 card.description,
                 style: TextStyle(color: Colors.grey.shade600, fontSize: 10),
-                maxLines: 2,
+                maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
+              if (card.expireDate != null)
+                Text(
+                  "Expires: ${card.expireDate}",
+                  style: const TextStyle(color: Colors.redAccent, fontSize: 9, fontWeight: FontWeight.bold),
+                ),
             ],
           ),
         ),
