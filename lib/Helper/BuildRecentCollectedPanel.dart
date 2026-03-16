@@ -5,37 +5,60 @@ import 'package:station_msloyalty/Services/FetchUserNameCache.dart';
 
 Widget buildRecentCollectedPanel() {
   return Column(
-    // Error က ဒီကောင်မှာ တက်နေတာ
     children: [
       // ၁။ Header (စာသား)
       Container(
-        padding: const EdgeInsets.all(11),
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
         width: double.infinity,
-        color: Colors.blueGrey[800],
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF0A192F), Color(0xFF132B4F)],
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
+          ),
+        ),
         child: const Text(
-          "Recent Collected (Last 20)",
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          "RECENT COLLECTED",
+          style: TextStyle(
+            color: Color(0xFFFFD700),
+            fontWeight: FontWeight.bold,
+            fontSize: 12,
+            letterSpacing: 1.2,
+          ),
         ),
       ),
 
-      // ၂။ List အပိုင်း (ဒါကို Expanded မအုပ်ရင် 'hasSize' error တက်မယ်)
+      // ၂။ List အပိုင်း
       Expanded(
         child: StreamBuilder<List<Map<String, dynamic>>>(
           stream: recentCollectedStream,
           builder: (context, snapshot) {
-            if (!snapshot.hasData)
-              return Center(
-                child: SizedBox(width: 200, height: 10, child: const LinearProgressIndicator()),
+            if (!snapshot.hasData) {
+              return const Center(
+                child: SizedBox(
+                  width: 150,
+                  height: 4,
+                  child: LinearProgressIndicator(
+                    backgroundColor: Color(0xFFF1F5F9),
+                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF1B4F72)),
+                  ),
+                ),
               );
+            }
 
-            // StreamBuilder ရဲ့ builder ထဲမှာ ဒါလေးသေချာထည့်ပါ
-            final items = List.from(snapshot.data!); // original list ကို copy ယူ
-            items.sort(
-              (a, b) => b['created_at'].compareTo(a['created_at']),
-            ); // အသစ်ဆုံးကို အပေါ်တင်
+            final now = DateTime.now();
+            final today = DateTime(now.year, now.month, now.day);
+            
+            final items = (snapshot.data ?? []).where((item) {
+              final createdAt = DateTime.parse(item['created_at']).toLocal();
+              final itemDate = DateTime(createdAt.year, createdAt.month, createdAt.day);
+              return itemDate.isAtSameMomentAs(today);
+            }).toList();
+            
+            items.sort((a, b) => b['created_at'].compareTo(a['created_at']));
 
             return ListView.builder(
-              // ၃။ Key ထည့်ပေးတာက List ကို အပေါ်ဆုံးကနေ Refresh ဖြစ်စေတယ်
+              padding: const EdgeInsets.only(top: 8, bottom: 20),
               key: ValueKey(items.isNotEmpty ? items.first['id'] : 'empty'),
               itemCount: items.length,
               itemBuilder: (context, index) {
@@ -50,32 +73,53 @@ Widget buildRecentCollectedPanel() {
 }
 
 Widget _buildRecentItemCard(dynamic item) {
-  return Card(
-    margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-    elevation: 0.5,
-    shape: RoundedRectangleBorder(
+  return Container(
+    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+    decoration: BoxDecoration(
+      color: Colors.white,
       borderRadius: BorderRadius.circular(12),
-      side: BorderSide(color: Colors.grey.shade100),
+      border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.03),
+          blurRadius: 10,
+          offset: const Offset(0, 4),
+        ),
+      ],
     ),
     child: Padding(
-      padding: const EdgeInsets.all(12.0),
+      padding: const EdgeInsets.all(14.0),
       child: Row(
         children: [
-          // User Avatar
-          CircleAvatar(
-            radius: 20,
-            backgroundColor: Colors.blue.shade50,
+          // User Avatar with Gradient
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [const Color(0xFF1B4F72).withValues(alpha: 0.1), const Color(0xFF1B4F72).withValues(alpha: 0.05)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              shape: BoxShape.circle,
+            ),
             child: FutureBuilder<String>(
               future: fetchUserName(item['user_id']),
               builder: (context, asyncSnapshot) {
-                return Text(
-                  (asyncSnapshot.data ?? "U")[0].toUpperCase(),
-                  style: TextStyle(color: Colors.blue.shade800, fontWeight: FontWeight.bold),
+                return Center(
+                  child: Text(
+                    (asyncSnapshot.data ?? "U")[0].toUpperCase(),
+                    style: const TextStyle(
+                      color: Color(0xFF1B4F72),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
                 );
               },
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 14),
 
           // Details
           Expanded(
@@ -87,38 +131,42 @@ Widget _buildRecentItemCard(dynamic item) {
                   builder: (context, asyncSnapshot) {
                     return Text(
                       asyncSnapshot.data ?? "Unknown User",
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        color: Color(0xFF1E293B),
+                      ),
                     );
                   },
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 6),
                 // Voucher No with Icon
                 Row(
                   children: [
-                    Icon(Icons.receipt_long_outlined, size: 14, color: Colors.grey.shade600),
+                    Icon(Icons.confirmation_number_outlined, size: 14, color: Colors.blueGrey[300]),
                     const SizedBox(width: 4),
                     Text(
                       item['voc_no'] ?? "-",
-                      style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+                      style: TextStyle(fontSize: 11, color: Colors.blueGrey[400], fontWeight: FontWeight.w500),
                     ),
                   ],
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 4),
                 // Date & Time
                 Row(
                   children: [
-                    Icon(Icons.calendar_month_outlined, size: 14, color: Colors.grey.shade600),
+                    Icon(Icons.calendar_today_outlined, size: 12, color: Colors.blueGrey[200]),
                     const SizedBox(width: 4),
                     Text(
-                      DateFormat('dd-MM-yyyy').format(DateTime.parse(item['created_at'])),
-                      style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+                      DateFormat('dd MMM yyyy').format(DateTime.parse(item['created_at']).toLocal()),
+                      style: TextStyle(fontSize: 10, color: Colors.blueGrey[300]),
                     ),
-                    const SizedBox(width: 8),
-                    Icon(Icons.access_time, size: 14, color: Colors.grey.shade600),
+                    const SizedBox(width: 10),
+                    Icon(Icons.access_time_rounded, size: 12, color: Colors.blueGrey[200]),
                     const SizedBox(width: 4),
                     Text(
-                      DateFormat('hh:mm a').format(DateTime.parse(item['created_at'])),
-                      style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+                      DateFormat('hh:mm aa').format(DateTime.parse(item['created_at']).toLocal()),
+                      style: TextStyle(fontSize: 10, color: Colors.blueGrey[300]),
                     ),
                   ],
                 ),
@@ -130,14 +178,13 @@ Widget _buildRecentItemCard(dynamic item) {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
-              color: Colors.green.shade50,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.green.shade100),
+              color: const Color(0xFF10B981).withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
-              "+${item['points_earned']} Pts",
-              style: TextStyle(
-                color: Colors.green.shade700,
+              "+${item['points_earned']}",
+              style: const TextStyle(
+                color: Color(0xFF059669),
                 fontWeight: FontWeight.bold,
                 fontSize: 12,
               ),
@@ -146,17 +193,5 @@ Widget _buildRecentItemCard(dynamic item) {
         ],
       ),
     ),
-  );
-}
-
-// Icon နဲ့ Text ကို တွဲပြမယ့် Helper Small Widget
-Widget _buildInfoRow(IconData icon, String text) {
-  return Row(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      Icon(icon, size: 12, color: Colors.grey[600]),
-      const SizedBox(width: 4),
-      Text(text, style: TextStyle(fontSize: 10, color: Colors.grey[700])),
-    ],
   );
 }

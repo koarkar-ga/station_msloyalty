@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -8,7 +7,6 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:station_msloyalty/AppConfig.dart';
-import 'package:station_msloyalty/Constants/constant.dart';
 import 'package:station_msloyalty/Helper/BuildProgessOverlay.dart';
 import 'package:station_msloyalty/Helper/DataCell.dart';
 import 'package:station_msloyalty/Helper/FetchWithProgress.dart';
@@ -20,6 +18,8 @@ import 'package:station_msloyalty/Model/BuildFuelTypeChip.dart';
 import 'package:station_msloyalty/Model/SaleLoadStatus.dart';
 import 'package:station_msloyalty/Model/SaleTypeModel.dart';
 import 'package:station_msloyalty/summary_view.dart';
+import 'package:station_msloyalty/Constants/StyleConstants.dart';
+import 'package:station_msloyalty/Services/CheckVocNoExists.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ReportsScreen extends StatefulWidget {
@@ -33,7 +33,7 @@ class _ReportsScreen extends State<ReportsScreen> {
   final supabase = Supabase.instance.client;
   final String apiUrl = "${AppConfig.apiUrl}/api/sales/recent";
   double _dragStartY = 0;
-  Set<int> _selectedIndices = {}; // Selected Indexes
+  final Set<int> _selectedIndices = {}; // Selected Indexes
   int? _lastSelectedIndex; // Last Selected Index
 
   List<dynamic> _salesData = [];
@@ -44,7 +44,8 @@ class _ReportsScreen extends State<ReportsScreen> {
   bool isLoadingSidebar = false; // Sidebar loading state
 
   //Range Text Controller for Time Closed
-  TextEditingController _rangeTimeClosedController = TextEditingController();
+  final TextEditingController _rangeTimeClosedController =
+      TextEditingController();
 
   // Start နှင့် End Time အတွက် Controller များ
   final TextEditingController _startDateController = TextEditingController(
@@ -53,11 +54,14 @@ class _ReportsScreen extends State<ReportsScreen> {
   final TextEditingController _endDateController = TextEditingController(
     text: DateFormat('yyyy-MM-dd').format(DateTime.now()),
   );
-  final TextEditingController _startTimeController = TextEditingController(text: "00:00:00");
-  final TextEditingController _endTimeController = TextEditingController(text: "23:59:59");
-
-  DateTime _startDate = DateTime.now();
-  DateTime _endDate = DateTime.now();
+  final TextEditingController _startTimeController = TextEditingController(
+    text: "00:00:00",
+  );
+  final TextEditingController _endTimeController = TextEditingController(
+    text: "23:59:59",
+  );
+  final StreamController<SalesLoadStatus> salesStreamController =
+      StreamController<SalesLoadStatus>.broadcast();
 
   DateTime _combineDateAndTime(DateTime date, String timeStr) {
     try {
@@ -143,7 +147,9 @@ class _ReportsScreen extends State<ReportsScreen> {
     List<int> sortedIndices = _selectedIndices.toList()..sort();
 
     // ၂။ Start Date အတွက် ပထမဆုံးရွေးတဲ့ Item အချိန်ကို ယူမယ်
-    DateTime startDT = DateTime.parse(_sysControlList[sortedIndices.first]['Sdate']);
+    DateTime startDT = DateTime.parse(
+      _sysControlList[sortedIndices.first]['Sdate'],
+    );
 
     DateTime endDT;
 
@@ -178,13 +184,16 @@ class _ReportsScreen extends State<ReportsScreen> {
     final String endStr = DateFormat('yyyy-MM-dd HH:mm:ss').format(end);
 
     // Node.js API Route (Search endpoint ကို သုံးထားပါသည်)
-    final url = '${AppConfig.apiUrl}/api/sales/search?startDate=$startStr&endDate=$endStr';
+    final url =
+        '${AppConfig.apiUrl}/api/sales/search?startDate=$startStr&endDate=$endStr';
 
     // စတင်ချိန်မှာ Loading True နဲ့ 0% ပို့လိုက်မယ်
-    salesStreamController.add(SalesLoadStatus(data: [], progress: 0.0, isLoading: true));
+    salesStreamController.add(
+      SalesLoadStatus(data: [], progress: 0.0, isLoading: true),
+    );
 
     try {
-      await fetchWithProgress(url, _salesData);
+      await fetchWithProgress(url, _salesData, salesStreamController);
     } catch (e) {
       debugPrint("Sales Fetch Error: $e");
     }
@@ -279,9 +288,11 @@ class _ReportsScreen extends State<ReportsScreen> {
   // နောက်ဆုံး Sale ၂၀ ကို API မှ ဆွဲယူခြင်း
   Future<void> _fetchLatestSales() async {
     // စတင်ချိန်မှာ Loading True နဲ့ 0% ပို့လိုက်မယ်
-    salesStreamController.add(SalesLoadStatus(data: [], progress: 0.0, isLoading: true));
+    salesStreamController.add(
+      SalesLoadStatus(data: [], progress: 0.0, isLoading: true),
+    );
     try {
-      await fetchWithProgress(apiUrl, _salesData);
+      await fetchWithProgress(apiUrl, _salesData, salesStreamController);
     } catch (e) {
       debugPrint("Fetch Error: $e");
     }
@@ -290,14 +301,19 @@ class _ReportsScreen extends State<ReportsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: MsAppBar(title: "Reports")),
+      appBar: const MsAppBar(
+        title: 'Sale Details Report',
+        showBackButton: true,
+      ),
 
       endDrawer: _buildRightSidebar(),
       body: StreamBuilder<SalesLoadStatus>(
         stream: salesStreamController.stream,
         builder: (context, snapshot) {
           // လက်ရှိ status ကို ယူမယ် (မရှိသေးရင် default status ပေးထားမယ်)
-          final status = snapshot.data ?? SalesLoadStatus(data: [], progress: 0.0, isLoading: true);
+          final status =
+              snapshot.data ??
+              SalesLoadStatus(data: [], progress: 0.0, isLoading: true);
 
           _salesData = status.data;
           return Stack(
@@ -323,7 +339,10 @@ class _ReportsScreen extends State<ReportsScreen> {
               ),
               Visibility(
                 visible: status.isLoading,
-                child: buildProgressOverlay(status.progress, status.data.length),
+                child: buildProgressOverlay(
+                  status.progress,
+                  status.data.length,
+                ),
               ),
             ],
           );
@@ -336,122 +355,118 @@ class _ReportsScreen extends State<ReportsScreen> {
   Widget _buildHeaderInfo() {
     double grandTotalLiter = _salesData.fold(
       0,
-      (prev, element) => prev + (double.tryParse(element['SALELITER'].toString()) ?? 0),
+      (prev, element) =>
+          prev + (double.tryParse(element['SALELITER'].toString()) ?? 0),
     );
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
-      padding: const EdgeInsets.all(15),
-      color: Colors.blueGrey.shade50,
+      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 15),
+      decoration: BoxDecoration(
+        color: (isDark ? StyleConstants.darkBg : Colors.blueGrey.shade50)
+            .withOpacity(0.5),
+        border: Border(
+          bottom: BorderSide(
+            color: (isDark ? Colors.white : Colors.black).withOpacity(0.05),
+          ),
+        ),
+      ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          Text(
-            "စုစုပေါင်းငွေ: ${NumberFormat('#,###').format(_salesData.fold<num>(0, (num sum, item) => sum + (item['TotalPrice'] ?? 0)))} Ks",
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.green),
+          _buildSummaryChip(
+            "စုစုပေါင်းငွေ",
+            "${NumberFormat('#,###').format(_salesData.fold<num>(0, (num sum, item) => sum + (item['TotalPrice'] ?? 0)))} Ks",
+            Colors.green,
+            isDark,
           ),
-          // UI တွင်ပြသရန်:
-          Text(
-            "စုစုပေါင်းလီတာ: ${grandTotalLiter.toStringAsFixed(2)} Lit",
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.blue),
+          _buildSummaryChip(
+            "စုစုပေါင်းလီတာ",
+            "${grandTotalLiter.toStringAsFixed(2)} Lit",
+            Colors.blue,
+            isDark,
           ),
         ],
       ),
     );
   }
 
+  Widget _buildSummaryChip(
+    String label,
+    String value,
+    Color color,
+    bool isDark,
+  ) {
+    return Column(
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            color: isDark ? Colors.white54 : Colors.blueGrey,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 1,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w900,
+            color: color,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHeaderCell(String text, int flex, Color color) {
+    return Expanded(
+      flex: flex,
+      child: Text(
+        text,
+        style: TextStyle(
+          fontWeight: FontWeight.w900,
+          color: color,
+          fontSize: 13,
+          letterSpacing: 0.5,
+        ),
+        textAlign: TextAlign.center,
+      ),
+    );
+  }
+
   // Build Data Table
   Widget _buildDataTable(List<dynamic> data, bool isLoading) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final headerColor = isDark ? StyleConstants.darkSurface : Colors.white;
+    final textColor = isDark ? Colors.white : Colors.black;
+
     return Column(
       children: [
         // ၁။ Fixed Header အပိုင်း (ဒီကောင်က Scroll မဖြစ်ပါ)
         Container(
           decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border.all(color: Colors.teal), // ပတ်ပတ်လည် Border
+            color: headerColor,
+            border: Border.all(
+              color: (isDark ? Colors.white : Colors.teal).withOpacity(0.2),
+            ),
           ),
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8), // Padding
-          child: const Row(
+          padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 8),
+          child: Row(
             children: [
-              Expanded(
-                flex: 0,
-                child: Text(
-                  'No',
-                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-              Expanded(
-                flex: 2,
-                child: Text(
-                  '  Voucher No',
-                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-              Expanded(
-                flex: 2,
-                child: Text(
-                  'Fuel Type',
-                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-              Expanded(
-                flex: 2,
-                child: Text(
-                  'Today Price',
-                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-              Expanded(
-                flex: 3,
-                child: Text(
-                  'Date & Time',
-                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-              Expanded(
-                flex: 2,
-                child: Text(
-                  'Vehicle No',
-                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-              Expanded(
-                flex: 2,
-                child: Text(
-                  'Sale Type',
-                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-              Expanded(
-                flex: 2,
-                child: Text(
-                  'Liter',
-                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-              Expanded(
-                flex: 2,
-                child: Text(
-                  'Amount  ',
-                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-              Expanded(
-                flex: 2,
-                child: Text(
-                  'Action  ',
-                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
-                  textAlign: TextAlign.center,
-                ),
-              ),
+              _buildHeaderCell('No', 1, textColor),
+              _buildHeaderCell('Voucher No', 2, textColor),
+              _buildHeaderCell('Fuel Type', 2, textColor),
+              _buildHeaderCell('Price', 2, textColor),
+              _buildHeaderCell('Date & Time', 3, textColor),
+              _buildHeaderCell('Vehicle No', 2, textColor),
+              _buildHeaderCell('Sale Type', 2, textColor),
+              _buildHeaderCell('Liter', 2, textColor),
+              _buildHeaderCell('Amount', 2, textColor),
+              _buildHeaderCell('Action', 2, textColor),
             ],
           ),
         ),
@@ -465,39 +480,68 @@ class _ReportsScreen extends State<ReportsScreen> {
               : ListView.builder(
                   itemCount: data.length,
                   itemBuilder: (context, index) {
+                    final isDark =
+                        Theme.of(context).brightness == Brightness.dark;
                     final sale = data[index];
-                    // index ကို ၂ နဲ့စားလို့ ပြတ်ရင် အရောင်ဖျော့၊ မပြတ်ရင် အဖြူရောင်
                     final bool isEven = index % 2 == 0;
-                    final Color rowColor = isEven ? Colors.blueGrey.shade50 : Colors.white;
+                    final Color rowColor = isEven
+                        ? (isDark
+                              ? StyleConstants.darkBg
+                              : Colors.blueGrey.shade50)
+                        : (isDark ? StyleConstants.darkSurface : Colors.white);
                     return Container(
-                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 15),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 12,
+                        horizontal: 15,
+                      ),
                       decoration: BoxDecoration(
                         color: rowColor,
                         border: Border(
-                          bottom: BorderSide(color: Colors.grey.shade300), // အလျားလိုက်မျဉ်း
-                          left: BorderSide(color: Colors.grey.shade300), // ဘယ်ဘက်မျဉ်း
-                          right: BorderSide(color: Colors.grey.shade300), // ညာဘက်မျဉ်း
+                          bottom: BorderSide(
+                            color:
+                                (isDark ? Colors.white : Colors.grey.shade300)
+                                    .withOpacity(0.1),
+                          ),
+                          left: BorderSide(
+                            color: Colors.grey.shade300,
+                          ), // ဘယ်ဘက်မျဉ်း
+                          right: BorderSide(
+                            color: Colors.grey.shade300,
+                          ), // ညာဘက်မျဉ်း
                         ),
                       ),
                       child: Row(
                         children: [
-                          _buildTableCell('${index + 1}', 0, isText: true), // အမှတ်စဉ်
-                          _buildTableCell('${sale['VocNo']}', 2, isText: true), // Invoice No
+                          _buildTableCell(
+                            '${index + 1}',
+                            0,
+                            isText: true,
+                          ), // အမှတ်စဉ်
+                          _buildTableCell(
+                            '${sale['VocNo']}',
+                            2,
+                            isText: true,
+                          ), // Invoice No
                           dataCell(
                             "${sale['FuelTypeName']}",
                             150,
                             cardColor: getFuelColor(sale['FuelTypeName'] ?? ''),
                             showRightBorder: true,
-                            alignment: Alignment.center, // Sale Type Badge ကိုတော့ အလယ်မှာပဲထားမယ်
+                            alignment: Alignment
+                                .center, // Sale Type Badge ကိုတော့ အလယ်မှာပဲထားမယ်
                           ),
                           // ယနေ့ပေါက်ဈေး (D1_FuelType မှလာသော SalePrice)
                           _buildTableCell(
-                            NumberFormat('#,###').format(sale['TodayPrice'] ?? 0),
+                            NumberFormat(
+                              '#,###',
+                            ).format(sale['TodayPrice'] ?? 0),
                             2,
                             isNumeric: true,
                           ),
                           _buildTableCell(
-                            DateFormat('dd-MM-yy HH:mm:ss').format(DateTime.parse(sale['S_Date'])),
+                            DateFormat(
+                              'dd-MM-yy HH:mm:ss',
+                            ).format(DateTime.parse(sale['S_Date'])),
                             3,
                           ),
                           _buildTableCell(
@@ -509,9 +553,12 @@ class _ReportsScreen extends State<ReportsScreen> {
                           dataCell(
                             "${sale['Sale_Type_name']}",
                             100,
-                            cardColor: getSaleTypeColor(sale['Sale_Type_name'] ?? ''),
+                            cardColor: getSaleTypeColor(
+                              sale['Sale_Type_name'] ?? '',
+                            ),
                             showRightBorder: true,
-                            alignment: Alignment.center, // Sale Type Badge ကိုတော့ အလယ်မှာပဲထားမယ်
+                            alignment: Alignment
+                                .center, // Sale Type Badge ကိုတော့ အလယ်မှာပဲထားမယ်
                           ),
 
                           _buildTableCell(
@@ -519,23 +566,17 @@ class _ReportsScreen extends State<ReportsScreen> {
                             2,
                           ),
                           _buildTableCell(
-                            NumberFormat(
-                              '#,###',
-                            ).format(double.tryParse(sale['TotalPrice'].toString()) ?? 0),
+                            NumberFormat('#,###').format(
+                              double.tryParse(sale['TotalPrice'].toString()) ??
+                                  0,
+                            ),
                             2,
                             isNumeric: true,
                           ),
                           sale['Sale_Type_name'] == 'Cash Sale' ||
                                   sale['Sale_Type_name'] == 'ePayment'
                               ? _buildTableCell(
-                                  TextFieldDialog(
-                                    supabase: supabase,
-                                    voc_no: sale['VocNo'],
-                                    vehical_no: sale['Vehical_No'],
-                                    fuel_type: sale['FuelTypeName'] ?? '',
-                                    amount: sale['TotalPrice']?.toString() ?? '0',
-                                    sale_type: sale['Sale_Type_name'] ?? '',
-                                  ),
+                                  CheckAlreadyCollectedReport(sale: sale, supabase: supabase),
                                   2,
                                   isAction: true,
                                 )
@@ -547,7 +588,8 @@ class _ReportsScreen extends State<ReportsScreen> {
                                       size: 20,
                                       color: Colors.red,
                                     ),
-                                    tooltip: '${sale['Sale_Type_name']} အတွက် ခွင့်မပြုပါ',
+                                    tooltip:
+                                        '${sale['Sale_Type_name']} အတွက် ခွင့်မပြုပါ',
                                   ),
                                   2,
                                   isAction: true,
@@ -571,14 +613,24 @@ class _ReportsScreen extends State<ReportsScreen> {
     bool isBold = false,
     bool isAction = false,
   }) {
-    final align = isNumeric ? TextAlign.right : (isText ? TextAlign.left : TextAlign.center);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final align = isNumeric
+        ? TextAlign.right
+        : (isText ? TextAlign.left : TextAlign.center);
     return Expanded(
       flex: flexValue,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 1), // Cell Padding
+        padding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 1,
+        ), // Cell Padding
         decoration: BoxDecoration(
           border: Border(
-            right: BorderSide(color: Colors.grey.shade300), // ကော်လံကြားမျဉ်း (Vertical Line)
+            right: BorderSide(
+              color: (isDark ? Colors.white : Colors.grey.shade300).withOpacity(
+                0.1,
+              ),
+            ), // ကော်လံကြားမျဉ်း (Vertical Line)
           ),
         ),
         child: isAction && content is Widget
@@ -589,6 +641,7 @@ class _ReportsScreen extends State<ReportsScreen> {
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+                  color: isDark ? Colors.white : StyleConstants.lightText,
                 ),
               ),
       ),
@@ -605,7 +658,8 @@ class _ReportsScreen extends State<ReportsScreen> {
 
     return SizedBox(
       width:
-          MediaQuery.of(context).size.width * 0.5 - 20, // Screen width ရဲ့ 50% နဲ့ margin ထည့်ခြင်း
+          MediaQuery.of(context).size.width * 0.5 -
+          20, // Screen width ရဲ့ 50% နဲ့ margin ထည့်ခြင်း
       child: Card(
         elevation: 4,
         margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -619,17 +673,28 @@ class _ReportsScreen extends State<ReportsScreen> {
               SizedBox(
                 width: double.infinity,
                 child: DataTable(
-                  headingRowColor: MaterialStateProperty.all(Colors.teal.withOpacity(0.1)),
+                  headingRowColor: WidgetStateProperty.all(
+                    Colors.teal.withOpacity(0.1),
+                  ),
                   columns: const [
                     DataColumn(
-                      label: Text('Sale Type', style: TextStyle(fontWeight: FontWeight.bold)),
+                      label: Text(
+                        'Sale Type',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
                     ),
                     DataColumn(
-                      label: Text('Total Liter', style: TextStyle(fontWeight: FontWeight.bold)),
+                      label: Text(
+                        'Total Liter',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
                       numeric: true,
                     ),
                     DataColumn(
-                      label: Text('Total Amount', style: TextStyle(fontWeight: FontWeight.bold)),
+                      label: Text(
+                        'Total Amount',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
                       numeric: true,
                     ),
                   ],
@@ -646,12 +711,17 @@ class _ReportsScreen extends State<ReportsScreen> {
                           ),
                         ),
                         // Liter ကို ဒသမ ၂ လုံးဖြင့်ပြသခြင်း
-                        DataCell(Text(entry.value['liters']!.toStringAsFixed(2))),
+                        DataCell(
+                          Text(entry.value['liters']!.toStringAsFixed(2)),
+                        ),
                         // Amount ကို ပုဒ်ဖြတ်ကော်မာဖြင့်ပြသခြင်း
                         DataCell(
                           Text(
                             NumberFormat('#,###').format(entry.value['amount']),
-                            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.teal),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.teal,
+                            ),
                           ),
                         ),
                       ],
@@ -676,7 +746,8 @@ class _ReportsScreen extends State<ReportsScreen> {
 
     return SizedBox(
       width:
-          MediaQuery.of(context).size.width * 0.5 - 20, // Screen width ရဲ့ 50% နဲ့ margin ထည့်ခြင်း
+          MediaQuery.of(context).size.width * 0.5 -
+          20, // Screen width ရဲ့ 50% နဲ့ margin ထည့်ခြင်း
       child: Card(
         elevation: 4,
         margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -692,17 +763,28 @@ class _ReportsScreen extends State<ReportsScreen> {
                 child: DataTable(
                   horizontalMargin: 10,
                   columnSpacing: 20,
-                  headingRowColor: MaterialStateProperty.all(Colors.orange.withOpacity(0.1)),
+                  headingRowColor: WidgetStateProperty.all(
+                    Colors.orange.withOpacity(0.1),
+                  ),
                   columns: const [
                     DataColumn(
-                      label: Text('Fuel Type', style: TextStyle(fontWeight: FontWeight.bold)),
+                      label: Text(
+                        'Fuel Type',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
                     ),
                     DataColumn(
-                      label: Text('Total Liter', style: TextStyle(fontWeight: FontWeight.bold)),
+                      label: Text(
+                        'Total Liter',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
                       numeric: true,
                     ),
                     DataColumn(
-                      label: Text('Total Amount', style: TextStyle(fontWeight: FontWeight.bold)),
+                      label: Text(
+                        'Total Amount',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
                       numeric: true,
                     ),
                   ],
@@ -719,7 +801,9 @@ class _ReportsScreen extends State<ReportsScreen> {
                           ),
                         ),
                         // Liter ကို ဒသမ ၂ လုံးဖြင့်ပြသခြင်း
-                        DataCell(Text(entry.value['liters']!.toStringAsFixed(2))),
+                        DataCell(
+                          Text(entry.value['liters']!.toStringAsFixed(2)),
+                        ),
                         DataCell(
                           Text(
                             NumberFormat('#,###').format(entry.value['amount']),
@@ -750,7 +834,10 @@ class _ReportsScreen extends State<ReportsScreen> {
           const SizedBox(height: 10),
           const Text("ဒေတာများ ဆွဲယူ၍မရပါ (သို့မဟုတ်) မရှိပါ"),
           const SizedBox(height: 20),
-          ElevatedButton(onPressed: _fetchLatestSales, child: const Text("ပြန်လုပ်ကြည့်ရန်")),
+          ElevatedButton(
+            onPressed: _fetchLatestSales,
+            child: const Text("ပြန်လုပ်ကြည့်ရန်"),
+          ),
         ],
       ),
     );
@@ -784,7 +871,11 @@ class _ReportsScreen extends State<ReportsScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.history_toggle_off, color: Colors.white, size: 40),
+                  const Icon(
+                    Icons.history_toggle_off,
+                    color: Colors.white,
+                    size: 40,
+                  ),
                   const SizedBox(height: 10),
                   const Text(
                     "System Control Logs",
@@ -793,7 +884,10 @@ class _ReportsScreen extends State<ReportsScreen> {
                   const SizedBox(height: 5),
                   // လက်ရှိရွေးထားတဲ့ Range ကို ပြပေးမယ်
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.white10,
                       borderRadius: BorderRadius.circular(5),
@@ -833,15 +927,20 @@ class _ReportsScreen extends State<ReportsScreen> {
                     },
                     onVerticalDragUpdate: (details) {
                       double currentY = details.localPosition.dy;
-                      double itemHeight = 70.0; // သားကြီးရဲ့ ListTile အမြင့် (Card margin ပါတွက်ပါ)
+                      double itemHeight =
+                          70.0; // သားကြီးရဲ့ ListTile အမြင့် (Card margin ပါတွက်ပါ)
 
                       // လက်ရှိ Mouse ရောက်နေတဲ့နေရာရဲ့ Index ကို တွက်မယ်
                       int startIndex = (_dragStartY / itemHeight).floor();
                       int currentIndex = (currentY / itemHeight).floor();
 
                       setState(() {
-                        int start = startIndex < currentIndex ? startIndex : currentIndex;
-                        int end = startIndex > currentIndex ? startIndex : currentIndex;
+                        int start = startIndex < currentIndex
+                            ? startIndex
+                            : currentIndex;
+                        int end = startIndex > currentIndex
+                            ? startIndex
+                            : currentIndex;
 
                         // Range ထဲက index တွေကို select လုပ်မယ်
                         for (int i = start; i <= end; i++) {
@@ -862,7 +961,8 @@ class _ReportsScreen extends State<ReportsScreen> {
                           child: Container(
                             color: isSelected
                                 ? Colors.blue
-                                : Colors.transparent, // Select ဖြစ်ရင် အရောင်ပြောင်းမယ်
+                                : Colors
+                                      .transparent, // Select ဖြစ်ရင် အရောင်ပြောင်းမယ်
                             child: ListTile(
                               title: Text(
                                 "Date: ${DateFormat('dd/MM/yyyy').format(DateTime.parse(_sysControlList[index]['Sdate'].toString()))}",
@@ -954,9 +1054,10 @@ class _ReportsScreen extends State<ReportsScreen> {
 
   // Date Search Row
   Widget _buildDateSearchRow(List<dynamic> data) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.only(right: 12, top: 10, bottom: 10, left: 12),
-      color: Colors.blueGrey.shade50,
+      color: isDark ? Colors.blueGrey.shade900 : Colors.blueGrey.shade50,
       child: Row(
         children: [
           Column(
@@ -997,12 +1098,21 @@ class _ReportsScreen extends State<ReportsScreen> {
                     _selectedDateRange!.start,
                     _startTimeController.text,
                   );
-                  final end = _combineDateAndTime(_selectedDateRange!.end, _endTimeController.text);
+                  final end = _combineDateAndTime(
+                    _selectedDateRange!.end,
+                    _endTimeController.text,
+                  );
 
                   print("Start: $start, End: $end");
                   await _searchSalesByDate(start, end);
                 },
-                child: Row(children: [Icon(Icons.search), SizedBox(width: 8), Text("Search")]),
+                child: Row(
+                  children: [
+                    Icon(Icons.search),
+                    SizedBox(width: 8),
+                    Text("Search"),
+                  ],
+                ),
               ),
               SizedBox(height: 10),
               // --- Search Button ---
@@ -1037,19 +1147,29 @@ class _ReportsScreen extends State<ReportsScreen> {
                     onPressed: () async {
                       // ၁။ Loading ကို အစမှာတင် တန်းဖွင့်လိုက်မယ်
                       salesStreamController.add(
-                        SalesLoadStatus(data: [], progress: 0.0, isLoading: true),
+                        SalesLoadStatus(
+                          data: [],
+                          progress: 0.0,
+                          isLoading: true,
+                        ),
                       );
 
                       try {
                         // ၄။ Excel ထုတ်မယ်
-                        await exportSaleDetailReport(List<Map<String, dynamic>>.from(_salesData));
+                        await exportSaleDetailReport(
+                          List<Map<String, dynamic>>.from(_salesData),
+                        );
                       } catch (e) {
                         print("Error: $e");
                         // Error တက်ရင်လည်း Loading ပိတ်ပေးဖို့လိုတယ်
                       } finally {
                         // ၅။ အားလုံးပြီးသွားပြီ (သို့မဟုတ်) Error တက်သွားပြီဆိုရင် Loading ပြန်ပိတ်မယ်
                         salesStreamController.add(
-                          SalesLoadStatus(data: data, progress: 1.0, isLoading: false),
+                          SalesLoadStatus(
+                            data: _salesData,
+                            progress: 1.0,
+                            isLoading: false,
+                          ),
                         );
                       }
                     },
@@ -1072,8 +1192,8 @@ class _ReportsScreen extends State<ReportsScreen> {
                       exportSaleDataReport(
                         _salesData.toList(),
                         AppConfig.stationName,
-                        "${DateFormat('dd-MM-yyyy').format(_startDate)} ${_startTimeController.text}",
-                        "${DateFormat('dd-MM-yyyy').format(_endDate)} ${_endTimeController.text}",
+                        "${DateFormat('dd-MM-yyyy').format(_selectedDateRange!.start)} ${_startTimeController.text}",
+                        "${DateFormat('dd-MM-yyyy').format(_selectedDateRange!.end)} ${_endTimeController.text}",
                       );
                     },
                     child: Row(
@@ -1096,7 +1216,7 @@ class _ReportsScreen extends State<ReportsScreen> {
                       SizedBox(width: 50, child: const Text("From ")),
                       Text(":  "),
                       Text(
-                        "${DateFormat('dd-MM-yyyy').format(_startDate)} ${_startTimeController.text}",
+                        "${DateFormat('dd-MM-yyyy').format(_selectedDateRange!.start)} ${_startTimeController.text}",
                       ),
                     ],
                   ),
@@ -1106,7 +1226,7 @@ class _ReportsScreen extends State<ReportsScreen> {
                       SizedBox(width: 50, child: const Text("To ")),
                       Text(":  "),
                       Text(
-                        "${DateFormat('dd-MM-yyyy').format(_endDate)} ${_endTimeController.text}",
+                        "${DateFormat('dd-MM-yyyy').format(_selectedDateRange!.end)} ${_endTimeController.text}",
                       ),
                     ],
                   ),
@@ -1140,11 +1260,15 @@ class _ReportsScreen extends State<ReportsScreen> {
               firstDate: DateTime(2020),
               lastDate: DateTime(2030),
             );
-            if (d != null)
+            if (d != null) {
               setState(() {
-                _selectedDateRange = DateTimeRange(start: d, end: _selectedDateRange!.end);
+                _selectedDateRange = DateTimeRange(
+                  start: d,
+                  end: _selectedDateRange!.end,
+                );
                 controller.text = DateFormat("dd-MM-yyyy").format(d);
               });
+            }
           },
           icon: const Icon(Icons.calendar_month),
           tooltip: "From Date",
@@ -1205,7 +1329,9 @@ class _ReportsScreen extends State<ReportsScreen> {
                   text: formatted,
                   // Cursor ကို လက်ရှိနေရာမှာပဲ ဆက်ရှိနေစေရန်
                   selection: TextSelection.collapsed(
-                    offset: currentOffset <= formatted.length ? currentOffset : formatted.length,
+                    offset: currentOffset <= formatted.length
+                        ? currentOffset
+                        : formatted.length,
                   ),
                 );
               }
@@ -1245,19 +1371,20 @@ class _ReportsScreen extends State<ReportsScreen> {
               String mm = "00";
               String ss = "00";
 
-              if (digits.length >= 2)
+              if (digits.length >= 2) {
                 hh = digits.substring(0, 2);
-              else
+              } else {
                 hh = digits.padLeft(2, '0');
+              }
 
-              if (digits.length >= 4)
+              if (digits.length >= 4) {
                 mm = digits.substring(2, 4);
-              else if (digits.length > 2)
+              } else if (digits.length > 2)
                 mm = digits.substring(2).padLeft(2, '0');
 
-              if (digits.length >= 6)
+              if (digits.length >= 6) {
                 ss = digits.substring(4, 6);
-              else if (digits.length > 4)
+              } else if (digits.length > 4)
                 ss = digits.substring(4).padLeft(2, '0');
 
               // ၄။ Validation (နာရီ ၂၄၊ မိနစ် ၆၀ ထက်မကျော်စေရန်)
@@ -1274,7 +1401,9 @@ class _ReportsScreen extends State<ReportsScreen> {
                   text: formatted,
                   // Cursor position ကို မပျောက်အောင် ထိန်းပေးခြင်း
                   selection: TextSelection.collapsed(
-                    offset: currentOffset <= formatted.length ? currentOffset : formatted.length,
+                    offset: currentOffset <= formatted.length
+                        ? currentOffset
+                        : formatted.length,
                   ),
                 );
               }
@@ -1289,5 +1418,49 @@ class _ReportsScreen extends State<ReportsScreen> {
   String convertToSqlDate(String dateStr) {
     List<String> p = dateStr.split('-');
     return "${p[2]}-${p[1]}-${p[0]}"; // Year-Month-Day
+  }
+}
+
+class CheckAlreadyCollectedReport extends StatelessWidget {
+  final Map<String, dynamic> sale;
+  final SupabaseClient supabase;
+
+  const CheckAlreadyCollectedReport({
+    super.key,
+    required this.sale,
+    required this.supabase,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // Report screen မှာ data က VocNo ပဲပါတယ်။ fullVocNo က station prefix လိုတယ်။
+    final String fullVocNo = "${AppConfig.stationId}${sale['VocNo']}";
+    return StreamBuilder<bool>(
+      stream: checkIfExistsStream(fullVocNo),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const SizedBox(
+            width: 14,
+            height: 14,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          );
+        }
+        if (snapshot.data == true) {
+          return const Tooltip(
+            message: "Point Collect လုပ်ပြီးပါပြီ",
+            child: Icon(Icons.check_circle_rounded, color: Colors.green, size: 24),
+          );
+        }
+
+        return TextFieldDialog(
+          supabase: supabase,
+          voc_no: sale['VocNo'],
+          vehical_no: sale['Vehical_No'] ?? '',
+          fuel_type: sale['FuelTypeName'] ?? '',
+          amount: sale['TotalPrice']?.toString() ?? '0',
+          sale_type: sale['Sale_Type_name'] ?? '',
+        );
+      },
+    );
   }
 }

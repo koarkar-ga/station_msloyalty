@@ -27,6 +27,7 @@ Widget dataCell(
   Color? textColor,
   Alignment alignment = Alignment.centerLeft, // Default က ဘယ်ဘက်ကပ်
   bool isBold = false, // Default က Bold မဟုတ်ဘူး
+  double fontSize = 12,
 }) {
   return Container(
     width: width,
@@ -43,7 +44,7 @@ Widget dataCell(
         : Text(
             text,
             style: TextStyle(
-              fontSize: 12,
+              fontSize: fontSize,
               color: textColor ?? Colors.black87,
               fontWeight: isBold ? FontWeight.bold : FontWeight.normal, // Bold စစ်မယ်
             ),

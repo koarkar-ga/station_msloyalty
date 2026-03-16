@@ -1,5 +1,4 @@
 import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:station_msloyalty/AppConfig.dart';
@@ -17,6 +16,7 @@ import 'package:station_msloyalty/Services/CheckVocNoExists.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:station_msloyalty/Helper/CameraScannerDialog.dart';
+import 'package:station_msloyalty/Constants/StyleConstants.dart';
 
 class CollectPointScreen extends StatefulWidget {
   const CollectPointScreen({super.key});
@@ -27,7 +27,8 @@ class CollectPointScreen extends StatefulWidget {
 
 class _CollectPointScreenState extends State<CollectPointScreen> {
   List<dynamic> localDataList = [];
-  //late Timer? _timer;
+  final StreamController<SalesLoadStatus> _localStreamController =
+      StreamController<SalesLoadStatus>.broadcast();
 
   @override
   void initState() {
@@ -35,205 +36,269 @@ class _CollectPointScreenState extends State<CollectPointScreen> {
     fetchPointSales();
   }
 
-  dispose() {
-    //_timer?.cancel();
-    super.dispose();
-  }
-
   Future<void> fetchPointSales() async {
-    // ၁။ အစမှာ Loading စဖွင့်မယ်
-    salesStreamController.add(SalesLoadStatus(data: [], progress: 0.0, isLoading: true));
+    _localStreamController.add(
+      SalesLoadStatus(data: [], progress: 0.0, isLoading: true),
+    );
     localDataList.clear();
-
     try {
       String lastRecentSalesUrl = "${AppConfig.apiUrl}/api/sales/recent";
-      await fetchWithProgress(lastRecentSalesUrl, localDataList);
-    } catch (e) {
-      print(e.toString());
-      salesStreamController.add(SalesLoadStatus(data: [], progress: 0.0, isLoading: false));
-    } finally {
-      salesStreamController.add(
-        SalesLoadStatus(data: localDataList, progress: 1.0, isLoading: false),
+      await fetchWithProgress(
+        lastRecentSalesUrl,
+        localDataList,
+        _localStreamController,
       );
+    } catch (e) {
+      _localStreamController.add(
+        SalesLoadStatus(data: [], progress: 0.0, isLoading: false),
+      );
+    } finally {
+      // final success status is already emitted by fetchWithProgress onDone.
     }
   }
 
   @override
+  void dispose() {
+    _localStreamController.close();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      appBar: AppBar(title: MsAppBar(title: "Collect Point")),
-      body: Row(
-        children: [
-          // ၁။ ဘယ်ဘက်ခြမ်း - StreamBuilder ကို Expanded အုပ်ပေးရမယ်
-          Expanded(
-            child: StreamBuilder<SalesLoadStatus>(
-              stream: salesStreamController.stream,
-              builder: (context, snapshot) {
-                final status =
-                    snapshot.data ?? SalesLoadStatus(data: [], progress: 0.0, isLoading: true);
-
-                return Stack(
-                  children: [
-                    Column(
-                      children: [
-                        _buildPointHeader(),
-                        Expanded(
-                          child: ListView.builder(
-                            itemCount: status.data.length,
-                            itemBuilder: (context, index) {
-                              final sale = status.data[index];
-                              return _buildDataRow(sale, index);
-                            },
-                          ),
+      appBar: const MsAppBar(title: 'Customer Details', showBackButton: true),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: isDark
+                ? [StyleConstants.darkBg, const Color(0xFF1E293B)]
+                : [StyleConstants.lightBg, const Color(0xFFE2E8F0)],
+          ),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: StreamBuilder<SalesLoadStatus>(
+                stream: _localStreamController.stream,
+                builder: (context, snapshot) {
+                  final status =
+                      snapshot.data ??
+                      SalesLoadStatus(data: [], progress: 0.0, isLoading: true);
+                  return Stack(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.all(24.0),
+                        child: Column(
+                          children: [
+                            _buildGlassHeader(context),
+                            const SizedBox(height: 16),
+                            Expanded(
+                              child: GlassContainer(
+                                child: ListView.builder(
+                                  itemCount: status.data.length,
+                                  itemBuilder: (context, index) =>
+                                      _buildDataRow(
+                                        status.data[index],
+                                        index,
+                                        context,
+                                      ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                    if (status.isLoading) buildProgressOverlay(status.progress, status.data.length),
-
-                    // ၂။ Floating Action Button ကို Left Panel ရဲ့ ညာဘက်အောက်မှာ ထားခြင်း
-                    Positioned(
-                      bottom: 20, // အောက်ခြေကနေ ၂၀ ခွာ
-                      right: 20, // ညာဘက်ဘေး (Recent Panel မရောက်ခင်) ကနေ ၂၀ ခွာ
-                      child: FloatingActionButton(
-                        // သားကြီးပေးထားတဲ့ shape အတိုင်း ပြန်ထည့်ပေးထားတယ်
-                        shape: const CircleBorder(
-                          side: BorderSide(color: Colors.white, style: BorderStyle.solid, width: 2),
-                        ),
-                        onPressed: () async {
-                          await fetchPointSales();
-                        },
-                        child: const Icon(Icons.refresh),
                       ),
-                    ),
-                  ],
-                );
-              },
+                      if (status.isLoading)
+                        buildProgressOverlay(
+                          status.progress,
+                          status.data.length,
+                        ),
+                      Positioned(
+                        bottom: 40,
+                        right: 40,
+                        child: FloatingActionButton(
+                          backgroundColor: isDark
+                              ? StyleConstants.darkAccent
+                              : StyleConstants.lightAccent,
+                          foregroundColor: isDark ? Colors.black : Colors.white,
+                          shape: const CircleBorder(),
+                          elevation: 4,
+                          onPressed: () => fetchPointSales(),
+                          child: const Icon(Icons.refresh_rounded),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
             ),
-          ),
 
-          // ၂။ ညာဘက်ခြမ်း - Panel (Fixed Width)
-          Container(
-            width: 350,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              border: Border(left: BorderSide(color: Colors.grey[300]!)),
+            // Right Panel
+            Padding(
+              padding: const EdgeInsets.fromLTRB(0, 24, 24, 24),
+              child: SizedBox(
+                width: 380,
+                child: GlassContainer(
+                  padding: EdgeInsets.zero,
+                  child: Column(
+                    children: [
+                      _buildRightPanelHeader(context),
+                      Expanded(child: buildRecentCollectedPanel()),
+                    ],
+                  ),
+                ),
+              ),
             ),
-            child: buildRecentCollectedPanel(), // ညာဘက် Panel
-          ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGlassHeader(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return GlassContainer(
+      opacity: 0.1,
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+      borderRadius: 16,
+      child: Row(
+        children: [
+          _headerCell("SR", 40, isCenter: true),
+          _headerCell("VOUCHER NO", 150, isCenter: true),
+          _headerCell("DATE & TIME", 180, isCenter: true),
+          _headerCell("FUEL TYPE", 140, isCenter: true),
+          _headerCell("LITER", 80, isCenter: true),
+          _headerCell("AMOUNT (MMK)", 120, isCenter: true),
+          _headerCell("SALE TYPE", 120, isCenter: true),
+          Expanded(child: _headerCell("STATUS", 0, isCenter: true)),
         ],
       ),
     );
   }
 
-  Widget _buildPointHeader() {
+  Widget _buildRightPanelHeader(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.blueGrey[800], // Header Background
+        border: Border(
+          bottom: BorderSide(
+            color: (isDark ? Colors.white : Colors.black).withOpacity(0.05),
+          ),
+        ),
       ),
       child: Row(
         children: [
-          _headerCell("Sr", 40, isCenter: true),
-          _headerCell("Voc No", 150, isCenter: true),
-          _headerCell("Date", 200, isCenter: true),
-          _headerCell("Fuel Type", 150, isCenter: true),
-          _headerCell("Liter", 80, isCenter: true),
-          _headerCell("Amount", 120, isCenter: true),
-          _headerCell("Sale Type", 100, isCenter: true),
-
-          Expanded(child: _headerCell("Status", 0, isCenter: true)),
+          Icon(
+            Icons.history_rounded,
+            color: isDark
+                ? StyleConstants.darkAccent
+                : StyleConstants.lightAccent,
+            size: 20,
+          ),
+          const SizedBox(width: 12),
+          Text(
+            "RECENTLY COLLECTED",
+            style: TextStyle(
+              fontWeight: FontWeight.w900,
+              fontSize: 13,
+              letterSpacing: 1.5,
+              color: isDark ? Colors.white70 : Colors.black54,
+            ),
+          ),
         ],
       ),
     );
   }
 
-  // Header Cell လေးတွေ ခဏခဏ မရေးရအောင် Helper function လေး
   Widget _headerCell(String text, double width, {bool isCenter = false}) {
     return SizedBox(
       width: width == 0 ? null : width,
       child: Text(
         text,
         textAlign: isCenter ? TextAlign.center : TextAlign.start,
-        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+        style: const TextStyle(
+          fontWeight: FontWeight.bold,
+          fontSize: 11,
+          letterSpacing: 1.2,
+          color: Colors.blueGrey,
+        ),
       ),
     );
   }
 
-  Widget _buildDataRow(dynamic sale, int index) {
-    // index က မ (odd) ဖြစ်ရင် အရောင်ဖျော့ဖျော့လေး တစ်ခု ထားမယ်
-    final bool isEven = index % 2 == 0;
-
+  Widget _buildDataRow(dynamic sale, int index, BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      // Row တစ်ခုလုံးကို အရောင်သတ်မှတ်မယ်
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
       decoration: BoxDecoration(
-        color: isEven ? Colors.white : Colors.blueGrey[50], // Alternative background color
         border: Border(
           bottom: BorderSide(
-            color: Colors.grey[300]!,
-            width: 0.5,
-          ), // Row တစ်ခုချင်းစီရဲ့ အောက်ခြေမျဉ်း
+            color: (isDark ? Colors.white : Colors.black).withOpacity(0.05),
+          ),
         ),
       ),
       child: Row(
         children: [
-          dataCell("${index + 1}", 40, showRightBorder: true),
-          dataCell("${sale['VocNo']}", 150, showRightBorder: true),
-          dataCell(
-            DateFormat('dd-MM-yyyy hh:mm:ss').format(DateTime.parse(sale['S_Date'])),
-            200,
-            showRightBorder: true,
+          _dataCellText("${index + 1}", 40, isCenter: true, context: context),
+          _dataCellText(
+            "${sale['VocNo']}",
+            150,
+            isBold: true,
+            isCenter: true,
+            context: context,
           ),
-
-          // FuelType Column
-          // Table Row ထဲက Fuel Type column နေရာမှာ
+          _dataCellText(
+            DateFormat('dd-MM-yy HH:mm').format(DateTime.parse(sale['S_Date'])),
+            180,
+            fontSize: 13,
+            isCenter: true,
+            context: context,
+          ),
           dataCell(
             sale['FuelTypeName'] ?? '-',
-            150, // width ကို သားကြီး စိတ်ကြိုက်ညှိပါ
-            showRightBorder: true,
-            cardColor: getFuelColor(sale['FuelTypeName'] ?? ''), // ဒီမှာ အရောင်လှမ်းပို့လိုက်မယ်
-            alignment: Alignment.center, // Chip ပုံစံဆိုတော့ အလယ်မှာထားတာ ပိုလှတယ်
+            140,
+            showRightBorder: false,
+            cardColor: getFuelColor(sale['FuelTypeName'] ?? ''),
+            alignment: Alignment.center,
           ),
-
-          // Liter Column (ညာဘက်ကပ် + Bold)
-          dataCell(
+          _dataCellText(
             "${sale['SALELITER']}",
             80,
-            showRightBorder: true,
-            alignment: Alignment.centerRight,
             isBold: true,
+            isCenter: true,
+            context: context,
           ),
-
-          // Amount Column (ညာဘက်ကပ် + Bold)
-          dataCell(
+          _dataCellText(
             formatter.format(sale['TotalPrice']),
             120,
-            showRightBorder: true,
-            alignment: Alignment.centerRight,
             isBold: true,
+            isCenter: true,
+            context: context,
           ),
-
           dataCell(
             "${sale['Sale_Type_name']}",
-            150,
+            120,
             cardColor: getSaleTypeColor(sale['Sale_Type_name'] ?? ''),
-            showRightBorder: true,
-            alignment: Alignment.center, // Sale Type Badge ကိုတော့ အလယ်မှာပဲထားမယ်
+            showRightBorder: false,
+            alignment: Alignment.center,
           ),
-
-          // Status Column
           Expanded(
             child: Align(
               alignment: Alignment.center,
               child:
-                  sale['Sale_Type_name'] == 'Cash Sale' ||
+                  (sale['Sale_Type_name'] == 'Cash Sale' ||
                       sale['Sale_Type_name'] == 'ePayment' ||
-                      sale['Sale_Type_name'] == 'Credit Sale'
+                      sale['Sale_Type_name'] == 'Credit Sale')
                   ? CheckAlreadyCollected(sale: sale)
-                  : IconButton(
-                      style: ButtonStyle(),
-                      onPressed: null,
-                      icon: const Icon(Icons.not_interested_rounded, size: 20, color: Colors.red),
-                      tooltip: '${sale['Sale_Type_name']} အတွက် ခွင့်မပြုပါ',
+                  : const Icon(
+                      Icons.block_flipped,
+                      size: 18,
+                      color: Colors.redAccent,
                     ),
             ),
           ),
@@ -241,18 +306,38 @@ class _CollectPointScreenState extends State<CollectPointScreen> {
       ),
     );
   }
+
+  Widget _dataCellText(
+    String text,
+    double width, {
+    bool isBold = false,
+    bool isCenter = false,
+    double fontSize = 14,
+    required BuildContext context,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return SizedBox(
+      width: width,
+      child: Text(
+        text,
+        textAlign: isCenter ? TextAlign.center : TextAlign.start,
+        style: TextStyle(
+          fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+          fontSize: fontSize,
+          color: isDark ? Colors.white : StyleConstants.lightText,
+        ),
+      ),
+    );
+  }
 }
 
-//Check Already Collected Point
 class CheckAlreadyCollected extends StatefulWidget {
   final Map<String, dynamic> sale;
   const CheckAlreadyCollected({super.key, required this.sale});
-
   @override
   State<CheckAlreadyCollected> createState() => _CheckAlreadyCollectedState();
 }
 
-//Check Already Collected Point
 class _CheckAlreadyCollectedState extends State<CheckAlreadyCollected> {
   final supabase = Supabase.instance.client;
   bool _useCameraScanner = false;
@@ -272,49 +357,51 @@ class _CheckAlreadyCollectedState extends State<CheckAlreadyCollected> {
 
   @override
   Widget build(BuildContext context) {
-    // stationId နဲ့ VocNo ကို တွဲပြီး fullVocNo လုပ်မယ်
     final String fullVocNo = "${AppConfig.stationId}${widget.sale['VocNo']}";
+    return StreamBuilder<bool>(
+      stream: checkIfExistsStream(fullVocNo),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting)
+          return const SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          );
+        if (snapshot.data == true)
+          return const Icon(Icons.check_circle, color: Colors.green, size: 24);
 
-    return Center(
-      child: StreamBuilder<bool>(
-        stream: checkIfExistsStream(fullVocNo),
-        builder: (context, snapshot) {
-          // ၁။ Loading State
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            );
-          }
-
-          // ၂။ Data Exists (Collect ပြီးသား)
-          if (snapshot.data == true) {
-            return const Icon(Icons.check_circle, color: Colors.green, size: 24);
-          }
-
-          // ၃။ Not Collected Yet (Button/Dialog ပြမယ်)
-          if (_useCameraScanner) {
-            return CameraScannerDialog(
-              supabase: supabase,
-              vocNo: widget.sale['VocNo'],
-              vehicalNo: widget.sale['Vehical_No'] ?? '',
-              fuelType: widget.sale['FuelTypeName'] ?? '',
-              amount: widget.sale['TotalPrice']?.toString() ?? '0',
-              saleType: widget.sale['Sale_Type_name'] ?? '',
-            );
-          } else {
-            return TextFieldDialog(
-              supabase: supabase,
-              voc_no: widget.sale['VocNo'],
-              vehical_no: widget.sale['Vehical_No'] ?? '',
-              fuel_type: widget.sale['FuelTypeName'] ?? '',
-              amount: widget.sale['TotalPrice']?.toString() ?? '0',
-              sale_type: widget.sale['Sale_Type_name'] ?? '',
-            );
-          }
-        },
-      ),
+        if (_useCameraScanner) {
+          return CameraScannerDialog(
+            supabase: supabase,
+            vocNo: widget.sale['VocNo'],
+            vehicalNo: widget.sale['Vehical_No'] ?? '',
+            fuelType: widget.sale['FuelTypeName'] ?? '',
+            amount: widget.sale['TotalPrice']?.toString() ?? '0',
+            saleType: widget.sale['Sale_Type_name'] ?? '',
+            unitPrice: double.tryParse(
+              widget.sale['SalePrice']?.toString() ?? '0',
+            ),
+            saleLiter: double.tryParse(
+              widget.sale['SALELITER']?.toString() ?? '0',
+            ),
+          );
+        } else {
+          return TextFieldDialog(
+            supabase: supabase,
+            voc_no: widget.sale['VocNo'],
+            vehical_no: widget.sale['Vehical_No'] ?? '',
+            fuel_type: widget.sale['FuelTypeName'] ?? '',
+            amount: widget.sale['TotalPrice']?.toString() ?? '0',
+            sale_type: widget.sale['Sale_Type_name'] ?? '',
+            unit_price: double.tryParse(
+              widget.sale['SalePrice']?.toString() ?? '0',
+            ),
+            sale_liter: double.tryParse(
+              widget.sale['SALELITER']?.toString() ?? '0',
+            ),
+          );
+        }
+      },
     );
   }
 }

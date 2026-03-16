@@ -83,10 +83,14 @@ Future<void> exportSaleDataReport(
 
   for (var row in rawData) {
     String grade = row['FuelTypeName'] ?? 'Unknown';
-    String saleType = row['Sale_Type_name'] ?? 'Cash Sale'; // e.g. CreditSale, ePayment
-    double liter = double.tryParse(row['SALELITER']?.toStringAsFixed(4) ?? '0') ?? 0;
-    double amount = double.tryParse(row['TotalPrice']?.toStringAsFixed(2) ?? '0') ?? 0;
-    double price = double.tryParse(row['TodayPrice']?.toStringAsFixed(2) ?? '0') ?? 0;
+    String saleType =
+        row['Sale_Type_name'] ?? 'Cash Sale'; // e.g. CreditSale, ePayment
+    double liter =
+        double.tryParse(row['SALELITER']?.toStringAsFixed(4) ?? '0') ?? 0;
+    double amount =
+        double.tryParse(row['TotalPrice']?.toStringAsFixed(2) ?? '0') ?? 0;
+    double price =
+        double.tryParse(row['TodayPrice']?.toStringAsFixed(2) ?? '0') ?? 0;
 
     // Grade မရှိသေးရင် အသစ်ဆောက်
     if (!groupedData.containsKey(grade)) {
@@ -122,46 +126,57 @@ Future<void> exportSaleDataReport(
       double saleGallon = data.totalLiter / 4.546;
 
       // Sale Type အလိုက် ပေါင်းလဒ်ကို Map ထဲမှာ စုထားမည်
-      saleTypeSummary[saleType] = (saleTypeSummary[saleType] ?? 0) + data.totalAmount;
+      saleTypeSummary[saleType] =
+          (saleTypeSummary[saleType] ?? 0) + data.totalAmount;
 
       // Print Data Row
       sheet.getRangeByIndex(currentRow, 1).setText(grade);
-      sheet.getRangeByIndex(currentRow, 2).setText(saleType); // Cash Sale / Credit Sale / etc.
+      sheet
+          .getRangeByIndex(currentRow, 2)
+          .setText(saleType); // Cash Sale / Credit Sale / etc.
       sheet
           .getRangeByIndex(currentRow, 3)
           .setNumber(double.parse(data.totalLiter.toStringAsFixed(3)));
       sheet.getRangeByIndex(currentRow, 4).setNumber(data.price);
-      sheet.getRangeByIndex(currentRow, 4).cellStyle.hAlign = xlsio.HAlignType.right;
+      sheet.getRangeByIndex(currentRow, 4).cellStyle.hAlign =
+          xlsio.HAlignType.right;
       sheet.getRangeByIndex(currentRow, 4).numberFormat = '#,##0.00';
 
       sheet
           .getRangeByIndex(currentRow, 5)
           .setNumber(double.tryParse(saleGallon.toStringAsFixed(4)) ?? 0);
-      sheet.getRangeByIndex(currentRow, 5).cellStyle.hAlign = xlsio.HAlignType.right;
+      sheet.getRangeByIndex(currentRow, 5).cellStyle.hAlign =
+          xlsio.HAlignType.right;
       sheet.getRangeByIndex(currentRow, 5).numberFormat = '#,##0.0000';
 
       sheet
           .getRangeByIndex(currentRow, 6)
           .setNumber(double.tryParse(data.totalAmount.toStringAsFixed(3)) ?? 0);
-      sheet.getRangeByIndex(currentRow, 6).cellStyle.hAlign = xlsio.HAlignType.right;
+      sheet.getRangeByIndex(currentRow, 6).cellStyle.hAlign =
+          xlsio.HAlignType.right;
       sheet.getRangeByIndex(currentRow, 6).numberFormat = '#,##0.00';
 
       sheet.getRangeByIndex(currentRow, 7).setNumber(0);
-      sheet.getRangeByIndex(currentRow, 7).cellStyle.hAlign = xlsio.HAlignType.right;
+      sheet.getRangeByIndex(currentRow, 7).cellStyle.hAlign =
+          xlsio.HAlignType.right;
       sheet.getRangeByIndex(currentRow, 7).numberFormat = '#,##0.00';
 
       sheet.getRangeByIndex(currentRow, 8).setNumber(0);
-      sheet.getRangeByIndex(currentRow, 8).cellStyle.hAlign = xlsio.HAlignType.right;
+      sheet.getRangeByIndex(currentRow, 8).cellStyle.hAlign =
+          xlsio.HAlignType.right;
       sheet.getRangeByIndex(currentRow, 8).numberFormat = '#,##0.00';
 
       sheet
           .getRangeByIndex(currentRow, 9)
           .setNumber(double.tryParse(data.totalAmount.toStringAsFixed(3)) ?? 0);
-      sheet.getRangeByIndex(currentRow, 9).cellStyle.hAlign = xlsio.HAlignType.right;
+      sheet.getRangeByIndex(currentRow, 9).cellStyle.hAlign =
+          xlsio.HAlignType.right;
       sheet.getRangeByIndex(currentRow, 9).numberFormat = '#,##0.00';
 
       // Apply Style
-      for (int i = 1; i <= 9; i++) sheet.getRangeByIndex(currentRow, i).cellStyle = cellStyle;
+      for (int i = 1; i <= 9; i++) {
+        sheet.getRangeByIndex(currentRow, i).cellStyle = cellStyle;
+      }
 
       currentRow++;
 
@@ -181,13 +196,17 @@ Future<void> exportSaleDataReport(
         .setNumber(double.parse(gradeTotalGallon.toStringAsFixed(4)));
     sheet.getRangeByIndex(currentRow, 6).setNumber(gradeTotalAmount);
     sheet.getRangeByIndex(currentRow, 6).numberFormat = '#,##0.00';
-    sheet.getRangeByIndex(currentRow, 6).cellStyle.hAlign = xlsio.HAlignType.right;
+    sheet.getRangeByIndex(currentRow, 6).cellStyle.hAlign =
+        xlsio.HAlignType.right;
 
     sheet.getRangeByIndex(currentRow, 9).setNumber(gradeTotalAmount);
     sheet.getRangeByIndex(currentRow, 9).numberFormat = '#,##0.00';
-    sheet.getRangeByIndex(currentRow, 9).cellStyle.hAlign = xlsio.HAlignType.right;
+    sheet.getRangeByIndex(currentRow, 9).cellStyle.hAlign =
+        xlsio.HAlignType.right;
 
-    for (int i = 1; i <= 9; i++) sheet.getRangeByIndex(currentRow, i).cellStyle = totalStyle;
+    for (int i = 1; i <= 9; i++) {
+      sheet.getRangeByIndex(currentRow, i).cellStyle = totalStyle;
+    }
     currentRow++;
 
     // Grand Totals ပေါင်းခြင်း
@@ -200,9 +219,12 @@ Future<void> exportSaleDataReport(
   currentRow += 2;
 
   // ၂။ Summary Header
-  sheet.getRangeByIndex(currentRow, 1, currentRow, 2).setText("Total Sale Type Summary");
+  sheet
+      .getRangeByIndex(currentRow, 1, currentRow, 2)
+      .setText("Total Sale Type Summary");
   sheet.getRangeByIndex(currentRow, 1, currentRow, 2).cellStyle.bold = true;
-  sheet.getRangeByIndex(currentRow, 1, currentRow, 2).cellStyle.hAlign = xlsio.HAlignType.center;
+  sheet.getRangeByIndex(currentRow, 1, currentRow, 2).cellStyle.hAlign =
+      xlsio.HAlignType.center;
   sheet.getRangeByIndex(currentRow, 1, currentRow, 9).merge();
   currentRow++;
 
@@ -212,7 +234,12 @@ Future<void> exportSaleDataReport(
     sheet.getRangeByIndex(currentRow, 1).setText("Total $typeName");
     sheet.getRangeByIndex(currentRow, 1).cellStyle.bold = true;
     sheet.getRangeByIndex(currentRow, 1, currentRow, 8).merge();
-    sheet.getRangeByIndex(currentRow, 1, currentRow, 8).cellStyle.borders.all.lineStyle =
+    sheet
+            .getRangeByIndex(currentRow, 1, currentRow, 8)
+            .cellStyle
+            .borders
+            .all
+            .lineStyle =
         xlsio.LineStyle.thin;
 
     // Sale Amount ကို Column F (နမူနာ) မှာ ပြမည်
@@ -240,7 +267,9 @@ Future<void> exportSaleDataReport(
   xlsio.Style totalCellStyle = workbook.styles.add('totalStyle$currentRow');
   totalCellStyle.numberFormat = '#,##0.000';
 
-  sheet.getRangeByIndex(currentRow, 5).setNumber(double.parse(grandTotalGallon.toStringAsFixed(4)));
+  sheet
+      .getRangeByIndex(currentRow, 5)
+      .setNumber(double.parse(grandTotalGallon.toStringAsFixed(4)));
   sheet.getRangeByIndex(currentRow, 5).numberFormat = '#,##0.0000';
 
   sheet.getRangeByIndex(currentRow, 6).setNumber(grandTotalAmount);
@@ -249,7 +278,9 @@ Future<void> exportSaleDataReport(
   sheet.getRangeByIndex(currentRow, 9).setNumber(grandTotalAmount);
   sheet.getRangeByIndex(currentRow, 9).numberFormat = '#,##0.00';
 
-  for (int i = 1; i <= 9; i++) sheet.getRangeByIndex(currentRow, i).cellStyle = totalStyle;
+  for (int i = 1; i <= 9; i++) {
+    sheet.getRangeByIndex(currentRow, i).cellStyle = totalStyle;
+  }
 
   // Auto Fit Columns
   //sheet.getRangeByName('A1:I$currentRow').autoFitColumns();
@@ -269,7 +300,8 @@ Future<void> exportSaleDataReport(
   workbook.dispose();
 
   final directory = await getApplicationSupportDirectory();
-  final path = "${AppConfig.exportPath}/SaleReport_${DateTime.now().millisecondsSinceEpoch}.xlsx";
+  final path =
+      "${AppConfig.exportPath}/SaleReport_${DateTime.now().millisecondsSinceEpoch}.xlsx";
   //final path = "${AppConfig.exportPath}/SaleReport_${DateTime.now().millisecondsSinceEpoch}.xlsx";
   final file = File(path);
   print(path);

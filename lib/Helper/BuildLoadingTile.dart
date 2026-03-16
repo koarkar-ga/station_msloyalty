@@ -1,27 +1,30 @@
 import 'dart:math' as math;
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
 Widget buildLoadingTile(String title) {
   return Container(
+    height: 120, // Give it a fixed height to avoid layout errors in Columns
     padding: const EdgeInsets.all(15),
     decoration: BoxDecoration(
-      color: Colors.white,
+      color: Colors.white.withOpacity(0.05), // Subtle background for glass feel
       borderRadius: BorderRadius.circular(15),
-      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 5)],
+      border: Border.all(color: Colors.white10),
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           title,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.blueGrey),
-        ),
-        const Expanded(
-          child: Center(
-            child: SPointLoadingIndicator(), // <--- ငါတို့ဆောက်လိုက်တဲ့ Indicator
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 13,
+            color: Colors.blueGrey,
           ),
+        ),
+        const SizedBox(height: 10),
+        const Center(
+          child: SPointLoadingIndicator(),
         ),
       ],
     ),
@@ -43,7 +46,10 @@ class _SPointLoadingIndicatorState extends State<SPointLoadingIndicator>
   void initState() {
     super.initState();
     // ၂ စက္ကန့်ကြာတိုင်း တစ်ပတ်လည်မည့် animation
-    _controller = AnimationController(vsync: this, duration: const Duration(seconds: 2))..repeat();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat();
   }
 
   @override

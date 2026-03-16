@@ -20,26 +20,40 @@ Stream<List<Map<String, dynamic>>> get recentCollectedStream {
   return Supabase.instance.client
       .from('fuel_transactions')
       .stream(primaryKey: ['id'])
+      .eq('station_id', AppConfig.stationId)
       .order('created_at', ascending: false)
       .limit(20);
 }
 
 // Sale Types များကို API မှယူပြီး Local သိမ်းခြင်း
 Future<void> syncSaleTypes() async {
-  final response = await http.get(Uri.parse("${AppConfig.apiUrl}/api/saletypes"));
-  if (response.statusCode == 200) {
-    List<dynamic> data = jsonDecode(response.body);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('local_sale_types', jsonEncode(data));
-  } else {
-    throw "Failed to sync Sale Types from API";
+  try {
+    print("Syncing Sale Types from ${AppConfig.apiUrl}/api/saletypes...");
+    final response = await http
+        .get(Uri.parse("${AppConfig.apiUrl}/api/saletypes"))
+        .timeout(const Duration(seconds: 10));
+
+    if (response.statusCode == 200) {
+      List<dynamic> data = jsonDecode(response.body);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('local_sale_types', jsonEncode(data));
+      print("Sale Types Synced successfully from API");
+    } else {
+      print("Sale Types API Error: ${response.statusCode}");
+      throw "Failed to sync Sale Types from API: ${response.statusCode}";
+    }
+  } catch (e) {
+    print("Sale Types Sync Exception: $e");
+    rethrow;
   }
 }
 
 Future<void> syncFuelTypes() async {
   try {
     // သားကြီးရဲ့ API URL ကို ဒီမှာ ထည့်ပါ
-    final response = await http.get(Uri.parse("${AppConfig.apiUrl}/api/fueltypes"));
+    final response = await http
+        .get(Uri.parse("${AppConfig.apiUrl}/api/fueltypes"))
+        .timeout(const Duration(seconds: 10));
 
     if (response.statusCode == 200) {
       final List<dynamic> fuelData = jsonDecode(response.body);

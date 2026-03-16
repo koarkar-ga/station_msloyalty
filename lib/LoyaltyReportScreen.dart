@@ -3,8 +3,13 @@ import 'package:intl/intl.dart';
 import 'package:station_msloyalty/AppConfig.dart';
 import 'package:station_msloyalty/Constants/constant.dart';
 import 'package:station_msloyalty/Helper/MsAppBar.dart';
+import 'package:station_msloyalty/Constants/StyleConstants.dart';
 import 'package:station_msloyalty/Services/FetchUserNameCache.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:syncfusion_flutter_xlsio/xlsio.dart' as xlsio;
+import 'package:path_provider/path_provider.dart';
+import 'package:open_file/open_file.dart';
+import 'dart:io';
 
 class LoyaltyReportScreen extends StatefulWidget {
   const LoyaltyReportScreen({super.key});
@@ -26,112 +31,129 @@ class _LoyaltyReportScreenState extends State<LoyaltyReportScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return DefaultTabController(
       length: 2,
       child: Scaffold(
-        appBar: AppBar(
-          title: const MsAppBar(title: "Loyalty Reports"),
-          bottom: const TabBar(
-            labelColor: Colors.black,
-            unselectedLabelColor: Colors.black,
-            indicatorColor: Colors.orangeAccent,
-            tabs: [
-              Tab(icon: Icon(Icons.stars), text: "Points Collected (ရယူမှု)"),
-              Tab(icon: Icon(Icons.card_giftcard), text: "Rewards Claimed (ထုတ်ယူမှု)"),
+        appBar: MsAppBar(
+          title: "Loyalty Reports",
+          showBackButton: true,
+          bottom: TabBar(
+            labelColor: isDark ? StyleConstants.darkAccent : StyleConstants.lightAccent,
+            unselectedLabelColor: isDark ? Colors.white70 : Colors.black54,
+            indicatorColor: isDark ? StyleConstants.darkAccent : StyleConstants.lightAccent,
+            indicatorWeight: 3,
+            tabs: const [
+              Tab(icon: Icon(Icons.stars), text: "Points Collected"),
+              Tab(icon: Icon(Icons.card_giftcard), text: "Rewards Claimed"),
             ],
           ),
         ),
-        body: TabBarView(children: [_buildPointsCollectedTab(), _buildRewardsClaimedTab()]),
+        body: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: isDark 
+                ? [StyleConstants.darkBg, const Color(0xFF1E293B)]
+                : [StyleConstants.lightBg, const Color(0xFFE2E8F0)],
+            ),
+          ),
+          child: TabBarView(
+            children: [_buildPointsCollectedTab(context), _buildRewardsClaimedTab(context)],
+          ),
+        ),
       ),
     );
   }
 
-  // --- Points Collected Tab ---
-  Widget _buildPointsCollectedTab() {
-    final startISO = DateTime(
-      _pointsStartDate.year,
-      _pointsStartDate.month,
-      _pointsStartDate.day,
-      0,
-      0,
-      0,
-    ).toIso8601String();
-    final endISO = DateTime(
-      _pointsEndDate.year,
-      _pointsEndDate.month,
-      _pointsEndDate.day,
-      23,
-      59,
-      59,
-    ).toIso8601String();
+  Widget _buildPointsCollectedTab(BuildContext context) {
+    final startISO = DateTime(_pointsStartDate.year, _pointsStartDate.month, _pointsStartDate.day, 0, 0, 0).toIso8601String();
+    final endISO = DateTime(_pointsEndDate.year, _pointsEndDate.month, _pointsEndDate.day, 23, 59, 59).toIso8601String();
 
-    return Column(
-      children: [
-        _buildDatePickerRow(
-          label: "ရက်စွဲရွေးချယ်ရန်",
-          startDate: _pointsStartDate,
-          endDate: _pointsEndDate,
-          onStartPicked: (date) => setState(() => _pointsStartDate = date),
-          onEndPicked: (date) => setState(() => _pointsEndDate = date),
-        ),
-        // Future Data Table
-        Expanded(child: _buildPointsDataTable(startISO, endISO)),
-      ],
+    return Padding(
+      padding: const EdgeInsets.all(24.0),
+      child: Column(
+        children: [
+          _buildGlassDatePickerRow(
+            label: "Points Collection History",
+            startDate: _pointsStartDate,
+            endDate: _pointsEndDate,
+            onStartPicked: (date) => setState(() => _pointsStartDate = date),
+            onEndPicked: (date) => setState(() => _pointsEndDate = date),
+            onExport: () => _exportToExcel(_pointsStartDate, _pointsEndDate),
+            context: context,
+          ),
+          const SizedBox(height: 24),
+          Expanded(
+            child: GlassContainer(
+              padding: const EdgeInsets.all(16),
+              child: _buildPointsDataTable(startISO, endISO),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  // --- Rewards Claimed Tab ---
-  Widget _buildRewardsClaimedTab() {
-    final startISO = DateTime(
-      _rewardsStartDate.year,
-      _rewardsStartDate.month,
-      _rewardsStartDate.day,
-      0,
-      0,
-      0,
-    ).toIso8601String();
-    final endISO = DateTime(
-      _rewardsEndDate.year,
-      _rewardsEndDate.month,
-      _rewardsEndDate.day,
-      23,
-      59,
-      59,
-    ).toIso8601String();
+  Widget _buildRewardsClaimedTab(BuildContext context) {
+    final startISO = DateTime(_rewardsStartDate.year, _rewardsStartDate.month, _rewardsStartDate.day, 0, 0, 0).toIso8601String();
+    final endISO = DateTime(_rewardsEndDate.year, _rewardsEndDate.month, _rewardsEndDate.day, 23, 59, 59).toIso8601String();
 
-    return Column(
-      children: [
-        _buildDatePickerRow(
-          label: "ရက်စွဲရွေးချယ်ရန်",
-          startDate: _rewardsStartDate,
-          endDate: _rewardsEndDate,
-          onStartPicked: (date) => setState(() => _rewardsStartDate = date),
-          onEndPicked: (date) => setState(() => _rewardsEndDate = date),
-        ),
-        // Future Data Table
-        Expanded(child: _buildRewardsDataTable(startISO, endISO)),
-      ],
+    return Padding(
+      padding: const EdgeInsets.all(24.0),
+      child: Column(
+        children: [
+          _buildGlassDatePickerRow(
+            label: "Rewards Redemption History",
+            startDate: _rewardsStartDate,
+            endDate: _rewardsEndDate,
+            onStartPicked: (date) => setState(() => _rewardsStartDate = date),
+            onEndPicked: (date) => setState(() => _rewardsEndDate = date),
+            onExport: () => _exportToExcel(_rewardsStartDate, _rewardsEndDate),
+            context: context,
+          ),
+          const SizedBox(height: 24),
+          Expanded(
+            child: GlassContainer(
+              padding: const EdgeInsets.all(16),
+              child: _buildRewardsDataTable(startISO, endISO),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  // Common Header/Date Picker Row
-  Widget _buildDatePickerRow({
+  Widget _buildGlassDatePickerRow({
     required String label,
     required DateTime startDate,
     required DateTime endDate,
     required Function(DateTime) onStartPicked,
     required Function(DateTime) onEndPicked,
+    required VoidCallback onExport,
+    required BuildContext context,
   }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      color: Colors.white,
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return GlassContainer(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      borderRadius: 16,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          Text(
+            label.toUpperCase(),
+            style: TextStyle(
+              fontWeight: FontWeight.bold, 
+              fontSize: 14, 
+              color: isDark ? Colors.white : StyleConstants.lightText,
+              letterSpacing: 1.2,
+            ),
+          ),
           Row(
             children: [
-              _dateButton("From: ${DateFormat('dd-MM-yyyy').format(startDate)}", () async {
+              _dateButton("FROM: ${DateFormat('dd MMM yyyy').format(startDate)}", () async {
                 DateTime? picked = await showDatePicker(
                   context: context,
                   initialDate: startDate,
@@ -139,9 +161,9 @@ class _LoyaltyReportScreenState extends State<LoyaltyReportScreen> {
                   lastDate: DateTime.now(),
                 );
                 if (picked != null) onStartPicked(picked);
-              }),
-              const SizedBox(width: 10),
-              _dateButton("To: ${DateFormat('dd-MM-yyyy').format(endDate)}", () async {
+              }, context),
+              const SizedBox(width: 12),
+              _dateButton("TO: ${DateFormat('dd MMM yyyy').format(endDate)}", () async {
                 DateTime? picked = await showDatePicker(
                   context: context,
                   initialDate: endDate,
@@ -149,7 +171,20 @@ class _LoyaltyReportScreenState extends State<LoyaltyReportScreen> {
                   lastDate: DateTime.now(),
                 );
                 if (picked != null) onEndPicked(picked);
-              }),
+              }, context),
+              const SizedBox(width: 20),
+              ElevatedButton.icon(
+                onPressed: onExport,
+                icon: const Icon(Icons.download_rounded, size: 18),
+                label: const Text("EXPORT EXCEL", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green.shade600,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                ),
+              ),
             ],
           ),
         ],
@@ -157,14 +192,25 @@ class _LoyaltyReportScreenState extends State<LoyaltyReportScreen> {
     );
   }
 
-  Widget _dateButton(String text, VoidCallback onPressed) {
-    return OutlinedButton.icon(
-      onPressed: onPressed,
-      icon: const Icon(Icons.calendar_month, size: 18),
-      label: Text(text),
-      style: OutlinedButton.styleFrom(
-        foregroundColor: Colors.blueGrey,
-        side: const BorderSide(color: Colors.blueGrey),
+  Widget _dateButton(String text, VoidCallback onPressed, BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return InkWell(
+      onTap: onPressed,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: (isDark ? Colors.white : Colors.black).withOpacity(0.05),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: (isDark ? Colors.white : Colors.black).withOpacity(0.1)),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.calendar_today_rounded, size: 14, color: isDark ? StyleConstants.darkAccent : StyleConstants.lightAccent),
+            const SizedBox(width: 8),
+            Text(text, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: isDark ? Colors.white70 : Colors.black87)),
+          ],
+        ),
       ),
     );
   }
@@ -190,122 +236,102 @@ class _LoyaltyReportScreenState extends State<LoyaltyReportScreen> {
   }
 
   Widget _buildPointsDataTable(String startISO, String endISO) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return FutureBuilder<List<Map<String, dynamic>>>(
       future: _fetchPointsData(startISO, endISO),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
-        if (snapshot.hasError) {
-          return Center(
-            child: Text("Error: ${snapshot.error}", style: const TextStyle(color: Colors.red)),
-          );
-        }
+        if (snapshot.hasError) return Center(child: Text("Error: ${snapshot.error}", style: const TextStyle(color: Colors.red)));
 
         final data = snapshot.data ?? [];
-
-        // Calculate Summary
-        double totalPoints = data.fold(0, (sum, item) => sum + (item['points_earned'] ?? 0));
+        if (data.isEmpty) return const Center(child: Text("No records found"));
 
         return Column(
           children: [
-            // Summary Header
-            Container(
-              padding: const EdgeInsets.all(15),
-              color: Colors.green.shade50,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.stars, color: Colors.green),
-                  const SizedBox(width: 10),
-                  Text(
-                    "ပေးလိုက်ရသော ပွိုင့်စုစုပေါင်း: ${formatter.format(totalPoints)} Pts",
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.green,
+            _buildInternalSummary(data, context),
+            const SizedBox(height: 16),
+            Expanded(
+              child: Theme(
+                data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: SingleChildScrollView(
+                    child: DataTable(
+                      headingRowHeight: 56,
+                      dataRowMaxHeight: 60,
+                      columns: [
+                        _tblHeader("No"),
+                        _tblHeader("User"),
+                        _tblHeader("Voucher"),
+                        _tblHeader("Date"),
+                        _tblHeader("Points"),
+                        _tblHeader("Fuel"),
+                        _tblHeader("Amount"),
+                      ],
+                      rows: List.generate(data.length, (index) {
+                        final row = data[index];
+                        return DataRow(
+                          cells: [
+                            DataCell(Text('${index + 1}')),
+                            DataCell(Text(row['user_name'] ?? '-')),
+                            DataCell(Text(row['voc_no'] ?? '-')),
+                            DataCell(Text(row['created_at'] != null ? DateFormat('dd/MM/yy HH:mm').format(DateTime.parse(row['created_at']).toLocal()) : '-')),
+                            DataCell(Text('+${row['points_earned']}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green))),
+                            DataCell(Text(row['fuel_type'] ?? '-')),
+                            DataCell(Text(formatter.format(row['amount_mmk'] ?? 0))),
+                          ],
+                        );
+                      }),
                     ),
                   ),
-                ],
+                ),
               ),
-            ),
-
-            // Expanded Table
-            Expanded(
-              child: data.isEmpty
-                  ? const Center(child: Text("မှတ်တမ်းမရှိပါ"))
-                  : SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: SingleChildScrollView(
-                        child: DataTable(
-                          headingRowColor: MaterialStateProperty.all(Colors.green.withOpacity(0.1)),
-                          columns: const [
-                            DataColumn(
-                              label: Text('No', style: TextStyle(fontWeight: FontWeight.bold)),
-                            ),
-                            DataColumn(
-                              label: Text(
-                                'User Name',
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                            DataColumn(
-                              label: Text(
-                                'Voucher No',
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                            DataColumn(
-                              label: Text(
-                                'Date & Time',
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                            DataColumn(
-                              label: Text(
-                                'Points Earned',
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                              numeric: true,
-                            ),
-                          ],
-                          rows: List.generate(data.length, (index) {
-                            final row = data[index];
-                            final userName = row['user_name'] ?? 'Unknown';
-                            final dateStr = row['created_at'] != null
-                                ? DateFormat(
-                                    'dd-MM-yy HH:mm a',
-                                  ).format(DateTime.parse(row['created_at']))
-                                : '-';
-
-                            return DataRow(
-                              color: MaterialStateProperty.all(
-                                index % 2 == 0 ? Colors.white : Colors.grey.shade50,
-                              ),
-                              cells: [
-                                DataCell(Text('${index + 1}')),
-                                DataCell(Text(userName)),
-                                DataCell(Text('${row['voc_no'] ?? '-'}')),
-                                DataCell(Text(dateStr)),
-                                DataCell(
-                                  Text(
-                                    '+${row['points_earned']} Pts',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.green.shade700,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            );
-                          }),
-                        ),
-                      ),
-                    ),
             ),
           ],
         );
       },
+    );
+  }
+
+  DataColumn _tblHeader(String label) {
+    return DataColumn(label: Text(label.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.1)));
+  }
+
+  Widget _buildInternalSummary(List<Map<String, dynamic>> data, BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    double totalPts = data.fold(0, (sum, item) => sum + (item['points_earned'] ?? 0));
+    double totalMmk = data.fold(0, (sum, item) => sum + (item['amount_mmk'] ?? 0));
+
+    return Row(
+      children: [
+        _sumTile("TOTAL POINTS EARNED", "${formatter.format(totalPts)} PTS", Colors.green, context),
+        const SizedBox(width: 16),
+        _sumTile("TOTAL REVENUE", "${formatter.format(totalMmk)} MMK", Colors.blue, context),
+      ],
+    );
+  }
+
+  Widget _sumTile(String title, String value, Color color, BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withOpacity(0.2)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: isDark ? Colors.white54 : Colors.black54)),
+            const SizedBox(height: 4),
+            Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: color)),
+          ],
+        ),
+      ),
     );
   }
 
@@ -319,26 +345,9 @@ class _LoyaltyReportScreenState extends State<LoyaltyReportScreen> {
         .order('created_at', ascending: false);
 
     List<Map<String, dynamic>> data = List<Map<String, dynamic>>.from(response);
-    Map<int, String> rewardCache = {};
-
     for (var row in data) {
-      // Fetch User Name
-      if (row['user_id'] != null) {
-        row['user_name'] = await fetchUserName(row['user_id']);
-      } else {
-        row['user_name'] = 'Unknown';
-      }
-
-      // Fetch Reward Title
-      if (row['reward_id'] != null) {
-        int rId = row['reward_id'];
-        if (!rewardCache.containsKey(rId)) {
-          rewardCache[rId] = await getRewardTitle(rId);
-        }
-        row['reward_title'] = rewardCache[rId];
-      } else {
-        row['reward_title'] = 'Unknown Item';
-      }
+      row['user_name'] = row['user_id'] != null ? await fetchUserName(row['user_id']) : 'Unknown';
+      row['reward_title'] = row['reward_id'] != null ? await getRewardTitle(row['reward_id']) : 'Unknown Item';
     }
     return data;
   }
@@ -347,133 +356,95 @@ class _LoyaltyReportScreenState extends State<LoyaltyReportScreen> {
     return FutureBuilder<List<Map<String, dynamic>>>(
       future: _fetchRewardsData(startISO, endISO),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (snapshot.hasError) {
-          // Fallback if relations fail
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.error_outline, size: 40, color: Colors.red),
-                Text(
-                  "Query Error: ${snapshot.error}",
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.red),
-                ),
-              ],
-            ),
-          );
-        }
+        if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
+        if (snapshot.hasError) return Center(child: Text("Error: ${snapshot.error}", style: const TextStyle(color: Colors.red)));
 
         final data = snapshot.data ?? [];
+        if (data.isEmpty) return const Center(child: Text("No records found"));
 
-        // Calculate Summary
-        double totalPointsSpent = data.fold(0, (sum, item) => sum + (item['points_spent'] ?? 0));
+        double totalSpent = data.fold(0, (sum, item) => sum + (item['points_spent'] ?? 0));
 
         return Column(
           children: [
-            // Summary Header
-            Container(
-              padding: const EdgeInsets.all(15),
-              color: Colors.orange.shade50,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.card_giftcard, color: Colors.orange),
-                  const SizedBox(width: 10),
-                  Text(
-                    "လဲလှယ်ထားသော ပွိုင့်စုစုပေါင်း: ${formatter.format(totalPointsSpent)} Pts",
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.orange.shade800,
+            _sumTile("TOTAL POINTS REDEEMED", "${formatter.format(totalSpent)} PTS", Colors.orange, context),
+            const SizedBox(height: 16),
+            Expanded(
+              child: Theme(
+                data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: SingleChildScrollView(
+                    child: DataTable(
+                      columns: [
+                        _tblHeader("No"),
+                        _tblHeader("User"),
+                        _tblHeader("Reward Item"),
+                        _tblHeader("Date"),
+                        _tblHeader("Points Spent"),
+                      ],
+                      rows: List.generate(data.length, (index) {
+                        final row = data[index];
+                        return DataRow(
+                          cells: [
+                            DataCell(Text('${index + 1}')),
+                            DataCell(Text(row['user_name'] ?? '-')),
+                            DataCell(Text(row['reward_title'] ?? '-')),
+                            DataCell(Text(row['created_at'] != null ? DateFormat('dd/MM/yy HH:mm').format(DateTime.parse(row['created_at']).toLocal()) : '-')),
+                            DataCell(Text('-${row['points_spent']}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.redAccent))),
+                          ],
+                        );
+                      }),
                     ),
                   ),
-                ],
+                ),
               ),
-            ),
-
-            // Expanded Table
-            Expanded(
-              child: data.isEmpty
-                  ? const Center(child: Text("မှတ်တမ်းမရှိပါ"))
-                  : SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: SingleChildScrollView(
-                        child: DataTable(
-                          headingRowColor: MaterialStateProperty.all(
-                            Colors.orange.withOpacity(0.1),
-                          ),
-                          columns: const [
-                            DataColumn(
-                              label: Text('No', style: TextStyle(fontWeight: FontWeight.bold)),
-                            ),
-                            DataColumn(
-                              label: Text(
-                                'User Name',
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                            DataColumn(
-                              label: Text(
-                                'Reward Item',
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                            DataColumn(
-                              label: Text(
-                                'Date & Time',
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                            DataColumn(
-                              label: Text(
-                                'Points Spent',
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                              numeric: true,
-                            ),
-                          ],
-                          rows: List.generate(data.length, (index) {
-                            final row = data[index];
-                            final userName = row['user_name'] ?? 'Unknown';
-                            final rewardTitle = row['reward_title'] ?? 'Unknown Item';
-                            final dateStr = row['created_at'] != null
-                                ? DateFormat(
-                                    'dd-MM-yy HH:mm a',
-                                  ).format(DateTime.parse(row['created_at']))
-                                : '-';
-
-                            return DataRow(
-                              color: MaterialStateProperty.all(
-                                index % 2 == 0 ? Colors.white : Colors.grey.shade50,
-                              ),
-                              cells: [
-                                DataCell(Text('${index + 1}')),
-                                DataCell(Text(userName)),
-                                DataCell(Text(rewardTitle)),
-                                DataCell(Text(dateStr)),
-                                DataCell(
-                                  Text(
-                                    '-${row['points_spent']} Pts',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.red.shade700,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            );
-                          }),
-                        ),
-                      ),
-                    ),
             ),
           ],
         );
       },
     );
+  }
+
+  Future<void> _exportToExcel(DateTime start, DateTime end) async {
+    try {
+      final startISO = DateTime(start.year, start.month, start.day, 0, 0, 0).toIso8601String();
+      final endISO = DateTime(end.year, end.month, end.day, 23, 59, 59).toIso8601String();
+      final data = await _fetchPointsData(startISO, endISO);
+
+      if (data.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("No data to export")));
+        return;
+      }
+
+      final xlsio.Workbook workbook = xlsio.Workbook();
+      final xlsio.Worksheet sheet = workbook.worksheets[0];
+      sheet.name = "Loyalty Report";
+
+      // Simple Export Logic
+      sheet.getRangeByIndex(1, 1).setText("No");
+      sheet.getRangeByIndex(1, 2).setText("User");
+      sheet.getRangeByIndex(1, 3).setText("Voucher");
+      sheet.getRangeByIndex(1, 4).setText("Points");
+
+      for (int i = 0; i < data.length; i++) {
+        sheet.getRangeByIndex(i + 2, 1).setNumber(i + 1.0);
+        sheet.getRangeByIndex(i + 2, 2).setText(data[i]['user_name'] ?? '-');
+        sheet.getRangeByIndex(i + 2, 3).setText(data[i]['voc_no'] ?? '-');
+        sheet.getRangeByIndex(i + 2, 4).setNumber(double.tryParse(data[i]['points_earned'].toString()) ?? 0);
+      }
+
+      final List<int> bytes = workbook.saveAsStream();
+      workbook.dispose();
+      final directory = await getApplicationDocumentsDirectory();
+      final path = "${directory.path}/Loyalty_Report_${DateTime.now().millisecondsSinceEpoch}.xlsx";
+      final file = File(path);
+      await file.writeAsBytes(bytes, flush: true);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Saved to Documents"), action: SnackBarAction(label: 'Open', onPressed: () => OpenFile.open(path))),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Export Error: $e")));
+    }
   }
 }

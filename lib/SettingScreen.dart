@@ -80,9 +80,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
               index: _selectedIndex,
               children: [
                 _buildScannerSettings(),
-                Stack(children: [_buildFuelPriceSettings(), inDevelopmentOverlay()]),
-                Stack(children: [_buildPrinterSettings(), inDevelopmentOverlay()]),
-                Stack(children: [_buildAccountSettings(), inDevelopmentOverlay()]),
+                Stack(
+                  children: [_buildFuelPriceSettings(), inDevelopmentOverlay()],
+                ),
+                Stack(
+                  children: [_buildPrinterSettings(), inDevelopmentOverlay()],
+                ),
+                Stack(
+                  children: [_buildAccountSettings(), inDevelopmentOverlay()],
+                ),
               ],
             ),
           ),
@@ -111,11 +117,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ListTile(
             leading: const Icon(Icons.camera_alt),
             title: const Text("Use PC Camera for QR Scan"),
-            subtitle: const Text("Enable this to use the webcam instead of an external scanner."),
+            subtitle: const Text(
+              "Enable this to use the webcam instead of an external scanner.",
+            ),
             trailing: Switch(
               value: _useCameraScanner,
               onChanged: _toggleCameraScanner,
-              activeColor: Colors.blue,
+              activeThumbColor: Colors.blue,
             ),
           ),
         ],
@@ -139,7 +147,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _priceEditTile("95 Ron", "2,800 MMK"),
           _priceEditTile("Premium Diesel", "3,100 MMK"),
           const SizedBox(height: 30),
-          ElevatedButton(onPressed: () {}, child: const Text("Update All Prices")),
+          ElevatedButton(
+            onPressed: () {},
+            child: const Text("Update All Prices"),
+          ),
         ],
       ),
     );
@@ -152,7 +163,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       trailing: SizedBox(
         width: 150,
         child: TextField(
-          decoration: const InputDecoration(hintText: "New Price", isDense: true),
+          decoration: const InputDecoration(
+            hintText: "New Price",
+            isDense: true,
+          ),
           keyboardType: TextInputType.number,
         ),
       ),
@@ -169,7 +183,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 20),
           const Text("No Printer Connected"),
           const SizedBox(height: 10),
-          ElevatedButton(onPressed: () {}, child: const Text("Scan for Printers")),
+          ElevatedButton(
+            onPressed: () {},
+            child: const Text("Scan for Printers"),
+          ),
         ],
       ),
     );
@@ -181,9 +198,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
       padding: const EdgeInsets.all(30.0),
       child: Column(
         children: [
-          const CircleAvatar(radius: 50, child: Icon(Icons.admin_panel_settings, size: 50)),
+          const CircleAvatar(
+            radius: 50,
+            child: Icon(Icons.admin_panel_settings, size: 50),
+          ),
           const SizedBox(height: 20),
-          const ListTile(title: Text("Username"), subtitle: Text("Admin_Station_01")),
+          const ListTile(
+            title: Text("Username"),
+            subtitle: Text("Admin_Station_01"),
+          ),
           const ListTile(title: Text("Role"), subtitle: Text("Manager")),
           const SizedBox(height: 20),
           OutlinedButton(

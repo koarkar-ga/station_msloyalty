@@ -15,9 +15,15 @@ class AuthService {
           .maybeSingle();
 
       if (data != null) {
-        return {'id': data['uuid'], 'status': 'success', 'message': 'Login Successful'};
+        return {
+          'id': data['uuid'],
+          'userlevel': data['userlevel'],
+          'station_code': data['station_code'],
+          'status': 'success',
+          'message': 'Login Successful'
+        };
       } else {
-        return {'id': null, 'status': 'error', 'message': 'Username (သို့မဟုတ်) password မမှန်ပါ။'};
+        return {'id': null, 'userlevel': null, 'status': 'error', 'message': 'Username (သို့မဟုတ်) password မမှန်ပါ။'};
       }
 
       //print("Login Success: ${data!['id']}");

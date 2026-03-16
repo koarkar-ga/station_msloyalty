@@ -3,10 +3,12 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:station_msloyalty/Constants/constant.dart';
 import 'package:station_msloyalty/Model/SaleLoadStatus.dart';
 
-Future<void> fetchWithProgress(String apiUrl, List<dynamic> allData) async {
+Future<void> fetchWithProgress(
+    String apiUrl, 
+    List<dynamic> allData, 
+    StreamController<SalesLoadStatus> controller) async {
   HttpClient client = HttpClient();
   HttpClientRequest request = await client.getUrl(Uri.parse(apiUrl));
   HttpClientResponse response = await request.close();
@@ -15,7 +17,7 @@ Future<void> fetchWithProgress(String apiUrl, List<dynamic> allData) async {
   int totalRecords = countHeader != null ? int.parse(countHeader) : 0;
 
   int currentRecordCount = 0;
-  salesStreamController.add(
+  controller.add(
     SalesLoadStatus(data: List.from(allData), progress: 0.0, isLoading: true),
   );
   allData.clear();
@@ -42,8 +44,8 @@ Future<void> fetchWithProgress(String apiUrl, List<dynamic> allData) async {
                 // ဒေတာ ၁၀ ခုရောက်တိုင်း Stream ထဲကို အချက်အလက်အသစ် ပို့မယ်
                 // ဒီနေရာမှာ setState ခေါ်စရာ မလိုတော့ဘူး!
                 if (currentRecordCount % 10 == 0 || currentRecordCount == totalRecords) {
-                  print(allData.length);
-                  salesStreamController.add(
+                  // print(allData.length);
+                  controller.add(
                     SalesLoadStatus(data: List.from(allData), progress: progress, isLoading: true),
                   );
                 }
@@ -55,8 +57,7 @@ Future<void> fetchWithProgress(String apiUrl, List<dynamic> allData) async {
         },
         onDone: () {
           // အားလုံးပြီးသွားရင် Loading False လုပ်ပြီး Final Data ကို ပို့မယ်
-
-          salesStreamController.add(
+          controller.add(
             SalesLoadStatus(data: List.from(allData), progress: 1.0, isLoading: false),
           );
         },

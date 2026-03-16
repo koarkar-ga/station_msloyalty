@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:station_msloyalty/Helper/RewardDetailDialog.dart';
 import 'package:station_msloyalty/Model/GiftCardModel.dart';
+import 'package:station_msloyalty/Constants/StyleConstants.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 Widget buildRewardGridView() {
@@ -25,66 +27,139 @@ Widget buildRewardGridView() {
         ),
         itemCount: cards.length,
         itemBuilder: (context, index) {
-          return _buildGiftCardItem(cards[index]);
+          return InkWell(
+            onTap: () {
+              showDialog(
+                context: context,
+                builder: (context) => RewardDetailDialog(card: cards[index]),
+              );
+            },
+            borderRadius: BorderRadius.circular(20),
+            child: _buildGiftCardItem(cards[index], context),
+          );
         },
       );
     },
   );
 }
 
-Widget _buildGiftCardItem(GiftCard card) {
-  return Card(
-    elevation: 2,
-    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // ၁။ ပစ္စည်းပုံ
-        Expanded(
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
-              image: DecorationImage(image: NetworkImage(card.imageUrl), fit: BoxFit.cover),
-            ),
-          ),
-        ),
-        // ၂။ အချက်အလက်များ
-        Padding(
-          padding: const EdgeInsets.all(10.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                card.title,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                "${card.pointsRequired} Pts",
-                style: TextStyle(
-                  color: Colors.blue.shade700,
-                  fontWeight: FontWeight.w900,
-                  fontSize: 16,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                card.description,
-                style: TextStyle(color: Colors.grey.shade600, fontSize: 10),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              if (card.expireDate != null)
-                Text(
-                  "Expires: ${card.expireDate}",
-                  style: const TextStyle(color: Colors.redAccent, fontSize: 9, fontWeight: FontWeight.bold),
-                ),
-            ],
-          ),
+Widget _buildGiftCardItem(GiftCard card, BuildContext context) {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  
+  return Container(
+    decoration: BoxDecoration(
+      color: isDark ? StyleConstants.darkSurface : StyleConstants.lightSurface,
+      borderRadius: BorderRadius.circular(20),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
+          blurRadius: 15,
+          offset: const Offset(0, 8),
         ),
       ],
+      border: Border.all(
+        color: (isDark ? Colors.white : Colors.black).withOpacity(0.05),
+        width: 1,
+      ),
+    ),
+    child: ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 1. Image + Points Badge
+          Expanded(
+            child: Stack(
+              children: [
+                Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    image: DecorationImage(
+                      image: NetworkImage(card.imageUrl),
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ),
+                // Points Badge (Glassmorphism)
+                Positioned(
+                  top: 10,
+                  right: 10,
+                  child: GlassContainer(
+                    opacity: 0.15,
+                    blur: 8,
+                    borderRadius: 12,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.stars_rounded, color: Color(0xFFFFD700), size: 14),
+                        const SizedBox(width: 4),
+                        Text(
+                          "${card.pointsRequired}",
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // 2. Info Section
+          Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  card.title,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 14,
+                    color: isDark ? Colors.white : StyleConstants.lightText,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  card.description,
+                  style: TextStyle(
+                    color: isDark ? Colors.white60 : Colors.blueGrey[400],
+                    fontSize: 11,
+                    height: 1.2,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (card.expireDate != null) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      "EXPIRES: ${card.expireDate}",
+                      style: TextStyle(
+                        color: isDark ? Colors.redAccent : Colors.red.shade700,
+                        fontSize: 8,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
     ),
   );
 }

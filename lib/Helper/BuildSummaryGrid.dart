@@ -8,62 +8,92 @@ import 'package:station_msloyalty/Helper/BuildLoadingTile.dart';
 import 'package:station_msloyalty/Model/BuildFuelTypeChip.dart';
 import 'package:station_msloyalty/Model/SaleTypeModel.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:flutter/material.dart';
-import 'dart:math' as math;
 
-Widget buildSummaryGrid() {
-  return GridView.count(
-    crossAxisCount: 2,
-    childAspectRatio: 1.5,
-    mainAxisSpacing: 20,
-    crossAxisSpacing: 20,
-    padding: const EdgeInsets.all(20),
-    children: [
-      // ၁။ Sale Type Summary (From Node.js API)
-      // _buildFutureChart("Sale Type Summary", _getSaleTypeData()),
+class SummaryGridWidget extends StatefulWidget {
+  const SummaryGridWidget({super.key});
 
-      // ၂။ Fuel Sale Summary (From Node.js API)
-      // _buildFutureChart("Fuel Sale Summary", _getFuelSaleData()),
-
-      // ၄။ Redemption Summary (From Supabase)
-      _buildFutureChart("Redemption Summary", _getRedemptionData()),
-
-      // ၃။ Point Reward Summary (From Supabase)
-      _buildFutureChart("Point Reward Summary", _getRewardPointData()),
-    ],
-  );
+  @override
+  State<SummaryGridWidget> createState() => _SummaryGridWidgetState();
 }
 
-Widget _buildFutureChart(String title, Future<List<PieChartSectionData>> futureData) {
+class _SummaryGridWidgetState extends State<SummaryGridWidget> {
+  late Future<List<PieChartSectionData>> _redemptionFuture;
+  late Future<List<PieChartSectionData>> _rewardPointFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _redemptionFuture = _getRedemptionData();
+    _rewardPointFuture = _getRewardPointData();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GridView.count(
+      crossAxisCount: 2,
+      childAspectRatio: 1.5,
+      mainAxisSpacing: 20,
+      crossAxisSpacing: 20,
+      padding: const EdgeInsets.all(20),
+      children: [
+        // ၁။ Sale Type Summary (From Node.js API)
+        // _buildFutureChart("Sale Type Summary", _getSaleTypeData()),
+
+        // ၂။ Fuel Sale Summary (From Node.js API)
+        // _buildFutureChart("Fuel Sale Summary", _getFuelSaleData()),
+
+        // ၄။ Redemption Summary (From Supabase)
+        _buildFutureChart("Redemption Summary", _redemptionFuture, context),
+
+        // ၃။ Point Reward Summary (From Supabase)
+        _buildFutureChart("Point Reward Summary", _rewardPointFuture, context),
+      ],
+    );
+  }
+}
+
+Widget _buildFutureChart(
+  String title,
+  Future<List<PieChartSectionData>> futureData,
+  BuildContext context,
+) {
   return FutureBuilder<List<PieChartSectionData>>(
     future: futureData,
     builder: (context, snapshot) {
       if (snapshot.connectionState == ConnectionState.waiting) {
         return buildLoadingTile(title); // Data စောင့်နေတုန်း
       } else if (snapshot.hasError) {
-        return _buildErrorTile(title, snapshot.error.toString()); // Error တက်ရင်
+        return _buildErrorTile(
+          title,
+          snapshot.error.toString(),
+          context,
+        ); // Error တက်ရင်
       } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-        return _buildEmptyTile(title); // Data မရှိရင်
+        return _buildEmptyTile(title, context); // Data မရှိရင်
       }
 
       // Data ရပြီဆိုမှ ငါတို့ အစောကလုပ်ထားတဲ့ Pie Chart Widget ကို ခေါ်မယ်
-      return _buildPieChartTile(title, snapshot.data!);
+      return _buildPieChartTile(title, snapshot.data!, context);
     },
   );
 }
 
-Widget _buildErrorTile(String title, String errorMessage) {
+Widget _buildErrorTile(String title, String errorMessage, BuildContext context) {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
   return Container(
     padding: const EdgeInsets.all(15),
     decoration: BoxDecoration(
-      color: Colors.white,
+      color: isDark ? Colors.white12 : Colors.white,
       borderRadius: BorderRadius.circular(15),
       border: Border.all(color: Colors.red.shade50),
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+        Text(
+          title,
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+        ),
         Expanded(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -72,7 +102,11 @@ Widget _buildErrorTile(String title, String errorMessage) {
               const SizedBox(height: 8),
               Text(
                 "Connection Error",
-                style: TextStyle(color: Colors.red[300], fontSize: 12, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  color: Colors.red[300],
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               const SizedBox(height: 4),
               Text(
@@ -90,21 +124,31 @@ Widget _buildErrorTile(String title, String errorMessage) {
   );
 }
 
-Widget _buildEmptyTile(String title) {
+Widget _buildEmptyTile(String title, BuildContext context) {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
   return Container(
     padding: const EdgeInsets.all(15),
-    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15)),
+    decoration: BoxDecoration(
+      color: isDark ? Colors.white12 : Colors.white,
+      borderRadius: BorderRadius.circular(15),
+    ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+        Text(
+          title,
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+        ),
         Expanded(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(Icons.inbox_outlined, color: Colors.grey[300], size: 35),
               const SizedBox(height: 10),
-              Text("No Data Found", style: TextStyle(color: Colors.grey[400], fontSize: 12)),
+              Text(
+                "No Data Found",
+                style: TextStyle(color: Colors.grey[400], fontSize: 12),
+              ),
               const SizedBox(height: 5),
               Text(
                 "Records will appear here once transactions start.",
@@ -119,18 +163,22 @@ Widget _buildEmptyTile(String title) {
   );
 }
 
-Widget _buildPieChartTile(String title, List<PieChartSectionData> sections) {
+Widget _buildPieChartTile(String title, List<PieChartSectionData> sections, BuildContext context) {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
   return Container(
     padding: const EdgeInsets.all(15),
     decoration: BoxDecoration(
-      color: Colors.white,
+      color: isDark ? Colors.white12 : Colors.white,
       borderRadius: BorderRadius.circular(12),
       border: Border.all(color: Colors.grey.shade100),
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+        Text(
+          title,
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+        ),
         const SizedBox(height: 10),
         Expanded(
           child: Row(
@@ -140,6 +188,7 @@ Widget _buildPieChartTile(String title, List<PieChartSectionData> sections) {
                 flex: 2,
                 child: PieChart(
                   PieChartData(
+                    pieTouchData: PieTouchData(enabled: false), // Disable hover effects to prevent mouse tracker crash
                     sections: sections,
                     centerSpaceRadius: 30, // အလယ်က အပေါက်
                     sectionsSpace: 2,
@@ -152,7 +201,9 @@ Widget _buildPieChartTile(String title, List<PieChartSectionData> sections) {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: sections.map((data) => _buildLegendItem(data)).toList(),
+                  children: sections
+                      .map((data) => _buildLegendItem(data, context))
+                      .toList(),
                 ),
               ),
             ],
@@ -163,7 +214,8 @@ Widget _buildPieChartTile(String title, List<PieChartSectionData> sections) {
   );
 }
 
-Widget _buildLegendItem(PieChartSectionData data) {
+Widget _buildLegendItem(PieChartSectionData data, BuildContext context) {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
   return Padding(
     padding: const EdgeInsets.symmetric(vertical: 2),
     child: Row(
@@ -174,7 +226,7 @@ Widget _buildLegendItem(PieChartSectionData data) {
         Expanded(
           child: Text(
             "${data.title}: ${data.value.toInt()}",
-            style: const TextStyle(fontSize: 11),
+            style: TextStyle(fontSize: 11, color: isDark ? Colors.white : Colors.black87),
             overflow: TextOverflow.ellipsis,
           ),
         ),
@@ -186,10 +238,15 @@ Widget _buildLegendItem(PieChartSectionData data) {
 // Redemption Summary အတွက် ဥပမာ (Supabase ကနေ count လုပ်ပြီး ယူနိုင်သည်)
 Future<List<PieChartSectionData>> _getRedemptionData() async {
   try {
+    final now = DateTime.now();
+    final todayStart = DateTime(now.year, now.month, now.day).toUtc().toIso8601String();
+
     // gift_cards table နဲ့ join ပြီး title တွေပါ တစ်ခါတည်း ယူနိုင်တယ်
     final response = await Supabase.instance.client
         .from('redemption_history')
-        .select('points_spent, gift_cards(title)');
+        .select('points_spent, gift_cards(title)')
+        .eq('station_id', AppConfig.stationId) // Filter by station
+        .gte('created_at', todayStart); // Filter by today
 
     Map<String, double> summary = {};
     for (var item in response) {
@@ -217,7 +274,14 @@ Future<List<PieChartSectionData>> _getRedemptionData() async {
 // ၁။ Sale Type Summary Data (Node.js API)
 Future<List<PieChartSectionData>> _getSaleTypeData() async {
   try {
-    final response = await http.get(Uri.parse('${AppConfig.apiUrl}/api/summary/saletypes'));
+    final now = DateTime.now();
+    final todayStart = DateTime(now.year, now.month, now.day).toUtc().toIso8601String();
+
+    final url = Uri.parse('${AppConfig.apiUrl}/api/summary/saletypes').replace(
+      queryParameters: {'stationId': AppConfig.stationId, 'date': todayStart},
+    );
+
+    final response = await http.get(url);
 
     if (response.statusCode == 200) {
       List<dynamic> data = jsonDecode(response.body);
@@ -241,7 +305,14 @@ Future<List<PieChartSectionData>> _getSaleTypeData() async {
 // ၂။ Fuel Sale Summary Data (Node.js API)
 Future<List<PieChartSectionData>> _getFuelSaleData() async {
   try {
-    final response = await http.get(Uri.parse('${AppConfig.apiUrl}/api/summary/fuelsales'));
+    final now = DateTime.now();
+    final todayStart = DateTime(now.year, now.month, now.day).toUtc().toIso8601String();
+
+    final url = Uri.parse('${AppConfig.apiUrl}/api/summary/fuelsales').replace(
+      queryParameters: {'stationId': AppConfig.stationId, 'date': todayStart},
+    );
+
+    final response = await http.get(url);
 
     if (response.statusCode == 200) {
       List<dynamic> data = jsonDecode(response.body);
@@ -265,14 +336,15 @@ Future<List<PieChartSectionData>> _getFuelSaleData() async {
 // ၃။ Reward Point Summary (Supabase)
 Future<List<PieChartSectionData>> _getRewardPointData() async {
   final now = DateTime.now();
-  final todayStart = DateTime(now.year, now.month, now.day).toIso8601String();
+  final todayStart = DateTime(now.year, now.month, now.day).toUtc().toIso8601String();
 
   final response = await Supabase.instance.client
       .from('fuel_transactions')
       .select('points_earned, fuel_type')
+      .eq('station_id', AppConfig.stationId) // Filter by station
       .gte('created_at', todayStart);
 
-  if (response == null || (response as List).isEmpty) {
+  if ((response as List).isEmpty) {
     return [];
   }
 
@@ -292,7 +364,8 @@ Future<List<PieChartSectionData>> _getRewardPointData() async {
   // ပေါင်းရလာတဲ့ Map ကို PieChartSectionData list အဖြစ်ပြောင်းမယ်
   return fuelPointsMap.entries.map((entry) {
     return PieChartSectionData(
-      value: entry.value, // ဒီမှာ count မဟုတ်တော့ဘဲ point amount စုစုပေါင်း ဖြစ်သွားပြီ
+      value: entry
+          .value, // ဒီမှာ count မဟုတ်တော့ဘဲ point amount စုစုပေါင်း ဖြစ်သွားပြီ
       title: entry.key,
       radius: 50,
       showTitle: false,
