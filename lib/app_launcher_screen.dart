@@ -47,121 +47,125 @@ class AppLauncherScreen extends StatelessWidget {
           const SizedBox(width: 8),
         ],
       ),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(10.0),
-          child: GridView.count(
-            shrinkWrap: true, // Grid ကို အလယ်မှာ စုပေးဖို့
-            crossAxisCount: 6, // တစ်တန်းမှာ ၄ ခုပြမယ်
-            crossAxisSpacing: 20,
-            mainAxisSpacing: 20,
-            children: [
-              _buildMenuButton(
-                context,
-                icon: Icons.dashboard_rounded,
-                label: "Dashboard",
-                color: Colors.blue,
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (context) => DashboardScreen()),
-                ),
-              ),
-              // _buildMenuButton(
-              //   context,
-              //   icon: Icons.local_gas_station,
-              //   label: "Sale Entry",
-              //   color: Colors.green,
-              //   onTap: () => Navigator.of(
-              //     context,
-              //   ).push(MaterialPageRoute(builder: (context) => const SaleEntryScreen())),
-              // ),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          int crossAxisCount = 5;
+          if (constraints.maxWidth < 500) {
+            crossAxisCount = 2;
+          } else if (constraints.maxWidth < 800) {
+            crossAxisCount = 3;
+          } else if (constraints.maxWidth < 1100) {
+            crossAxisCount = 4;
+          }
 
-              // ... GridView ရဲ့ children ထဲမှာ ဒါလေးတွေ ထပ်ဖြည့်ပါ ...
-              _buildMenuButton(
-                context,
-                icon: Icons.add_chart_rounded, // Point စုတဲ့ Icon
-                label: "Collect Point",
-                color: Colors.purple,
-                onTap: () {
-                  // Collect Point Screen ဆီသွားမည့် Logic
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const CollectPointScreen(),
-                    ),
-                  );
-                },
-              ),
+          double spacing = constraints.maxWidth < 600 ? 16.0 : 32.0;
 
-              _buildMenuButton(
-                context,
-                icon: Icons.card_giftcard_rounded, // Reward/Gift Icon
-                label: "Reward Point",
-                color: Colors.pink,
-                onTap: () {
-                  // Reward Point Screen ဆီသွားမည့် Logic
-                  Navigator.push(
+          return Center(
+            child: Padding(
+              padding: EdgeInsets.all(spacing),
+              child: GridView.count(
+                shrinkWrap: true,
+                crossAxisCount: crossAxisCount,
+                crossAxisSpacing: spacing,
+                mainAxisSpacing: spacing,
+                children: [
+                  _buildMenuButton(
                     context,
-                    MaterialPageRoute(
-                      builder: (context) => RewardPointScreen(),
+                    icon: Icons.dashboard_rounded,
+                    label: "Dashboard",
+                    color: Colors.blue,
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (context) => DashboardScreen()),
                     ),
-                  );
-                },
+                  ),
+                  _buildMenuButton(
+                    context,
+                    icon: Icons.add_chart_rounded, // Point စုတဲ့ Icon
+                    label: "Collect Point",
+                    color: Colors.purple,
+                    onTap: () {
+                      // Collect Point Screen ဆီသွားမည့် Logic
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const CollectPointScreen(),
+                        ),
+                      );
+                    },
+                  ),
+
+                  _buildMenuButton(
+                    context,
+                    icon: Icons.card_giftcard_rounded, // Reward/Gift Icon
+                    label: "Reward Point",
+                    color: Colors.pink,
+                    onTap: () {
+                      // Reward Point Screen ဆီသွားမည့် Logic
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => RewardPointScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  _buildMenuButton(
+                    context,
+                    icon: Icons.assessment,
+                    label: "Reports",
+                    color: Colors.orange,
+                    onTap: () {
+                      if (AppConfig.currentUserLevel == 1) {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => const ReportsScreen(),
+                          ),
+                        );
+                      } else {
+                        _showNoPermissionDialog(context);
+                      }
+                    },
+                  ),
+                  _buildMenuButton(
+                    context,
+                    icon: Icons.pie_chart_rounded, // Loyalty Reports Icon
+                    label: "Loyalty Reports",
+                    color: Colors.teal,
+                    onTap: () {
+                      if (AppConfig.currentUserLevel == 1) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const LoyaltyReportScreen(),
+                          ),
+                        );
+                      } else {
+                        _showNoPermissionDialog(context);
+                      }
+                    },
+                  ),
+                  _buildMenuButton(
+                    context,
+                    icon: Icons.settings,
+                    label: "Settings",
+                    color: Colors.grey,
+                    onTap: () {
+                      if (AppConfig.currentUserLevel == 1) {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => const SettingsScreen(),
+                          ),
+                        );
+                      } else {
+                        _showNoPermissionDialog(context);
+                      }
+                    },
+                  ),
+                ],
               ),
-              _buildMenuButton(
-                context,
-                icon: Icons.assessment,
-                label: "Reports",
-                color: Colors.orange,
-                onTap: () {
-                  if (AppConfig.currentUserLevel == 1) {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => const ReportsScreen(),
-                      ),
-                    );
-                  } else {
-                    _showNoPermissionDialog(context);
-                  }
-                },
-              ),
-              _buildMenuButton(
-                context,
-                icon: Icons.pie_chart_rounded, // Loyalty Reports Icon
-                label: "Loyalty Reports",
-                color: Colors.teal,
-                onTap: () {
-                  if (AppConfig.currentUserLevel == 1) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const LoyaltyReportScreen(),
-                      ),
-                    );
-                  } else {
-                    _showNoPermissionDialog(context);
-                  }
-                },
-              ),
-              _buildMenuButton(
-                context,
-                icon: Icons.settings,
-                label: "Settings",
-                color: Colors.grey,
-                onTap: () {
-                  if (AppConfig.currentUserLevel == 1) {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => const SettingsScreen(),
-                      ),
-                    );
-                  } else {
-                    _showNoPermissionDialog(context);
-                  }
-                },
-              ),
-            ],
-          ),
-        ),
+            ),
+          );
+        },
       ),
     );
   }

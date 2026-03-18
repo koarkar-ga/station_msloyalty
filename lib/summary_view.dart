@@ -21,11 +21,11 @@ class _SummaryViewState extends State<SummaryView> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 16.0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final bool isMobile = constraints.maxWidth < 750;
+        
+        final children = [
           // Table 1: Sale Type
           _buildPanel(
             accentColor: Colors.orangeAccent,
@@ -35,9 +35,10 @@ class _SummaryViewState extends State<SummaryView> {
             onToggle: () => setState(() => isTypeExpanded = !isTypeExpanded),
             child: widget.saleSummaryTable,
             context: context,
+            isMobile: isMobile,
           ),
 
-          const SizedBox(width: 20),
+          if (!isMobile) const SizedBox(width: 20) else const SizedBox(height: 20),
 
           // Table 2: Fuel Grade
           _buildPanel(
@@ -48,9 +49,20 @@ class _SummaryViewState extends State<SummaryView> {
             onToggle: () => setState(() => isFuelExpanded = !isFuelExpanded),
             child: widget.fuelSummaryTable,
             context: context,
+            isMobile: isMobile,
           ),
-        ],
-      ),
+        ];
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16.0),
+          child: isMobile 
+            ? Column(children: children)
+            : Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: children,
+              ),
+        );
+      },
     );
   }
 
@@ -62,11 +74,11 @@ class _SummaryViewState extends State<SummaryView> {
     required VoidCallback onToggle,
     required Widget child,
     required BuildContext context,
+    required bool isMobile,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
-    return Expanded(
-      child: Column(
+    final panelContent = Column(
         children: [
           InkWell(
             onTap: onToggle,
@@ -110,7 +122,7 @@ class _SummaryViewState extends State<SummaryView> {
             ),
           ],
         ],
-      ),
-    );
+      );
+    return isMobile ? panelContent : Expanded(child: panelContent);
   }
 }

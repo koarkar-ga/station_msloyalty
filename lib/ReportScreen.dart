@@ -13,13 +13,13 @@ import 'package:station_msloyalty/Helper/FetchWithProgress.dart';
 import 'package:station_msloyalty/Helper/MsAppBar.dart';
 import 'package:station_msloyalty/Helper/PumpBySaleReport.dart';
 import 'package:station_msloyalty/Helper/SaleDetailReport.dart';
-import 'package:station_msloyalty/Helper/TextFieldDialog.dart';
 import 'package:station_msloyalty/Model/BuildFuelTypeChip.dart';
 import 'package:station_msloyalty/Model/SaleLoadStatus.dart';
 import 'package:station_msloyalty/Model/SaleTypeModel.dart';
 import 'package:station_msloyalty/summary_view.dart';
 import 'package:station_msloyalty/Constants/StyleConstants.dart';
-import 'package:station_msloyalty/Services/CheckVocNoExists.dart';
+import 'package:station_msloyalty/Screens/CheckAlreadyCollectedReport.dart';
+import 'package:station_msloyalty/Screens/ReportDetailListScreen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ReportsScreen extends StatefulWidget {
@@ -315,28 +315,40 @@ class _ReportsScreen extends State<ReportsScreen> {
               snapshot.data ??
               SalesLoadStatus(data: [], progress: 0.0, isLoading: true);
 
-          _salesData = status.data;
+          final isMobile = MediaQuery.of(context).size.width < 1000;
+          
           return Stack(
             children: [
-              Column(
-                children: [
-                  //_buildSearchHeader(),
-                  _buildDateSearchRow(status.data), // Date Range Picker Button
-                  //Summary Table ကို ခေါ်သုံးပါ ---
-                  SummaryView(
-                    saleSummaryTable: _buildTypeSummaryTable(),
-                    fuelSummaryTable: _buildFuelSummaryTable(),
-                  ),
-                  // Header Information
-                  _buildHeaderInfo(),
-                  Expanded(
-                    flex: 1,
-                    child: _salesData.isEmpty
-                        ? _buildEmptyState()
-                        : _buildDataTable(status.data, status.isLoading),
-                  ),
-                ],
-              ),
+              isMobile
+                  ? ListView(
+                      children: [
+                        _buildDateSearchRow(isMobile, status.data),
+                        SummaryView(
+                          saleSummaryTable: _buildTypeSummaryTable(isMobile),
+                          fuelSummaryTable: _buildFuelSummaryTable(isMobile),
+                        ),
+                        _buildHeaderInfo(isMobile),
+                        _salesData.isEmpty
+                            ? _buildEmptyState()
+                            : _buildMobileShowDetailButton(status.data),
+                      ],
+                    )
+                  : Column(
+                      children: [
+                        _buildDateSearchRow(isMobile, status.data),
+                        SummaryView(
+                          saleSummaryTable: _buildTypeSummaryTable(isMobile),
+                          fuelSummaryTable: _buildFuelSummaryTable(isMobile),
+                        ),
+                        _buildHeaderInfo(isMobile),
+                        Expanded(
+                          flex: 1,
+                          child: _salesData.isEmpty
+                              ? _buildEmptyState()
+                              : _buildDataTable(status.data, status.isLoading),
+                        ),
+                      ],
+                    ),
               Visibility(
                 visible: status.isLoading,
                 child: buildProgressOverlay(
@@ -352,7 +364,7 @@ class _ReportsScreen extends State<ReportsScreen> {
   }
 
   // Build Header Information
-  Widget _buildHeaderInfo() {
+  Widget _buildHeaderInfo(bool isMobile) {
     double grandTotalLiter = _salesData.fold(
       0,
       (prev, element) =>
@@ -372,8 +384,10 @@ class _ReportsScreen extends State<ReportsScreen> {
           ),
         ),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
+      child: Wrap(
+        alignment: WrapAlignment.spaceAround,
+        spacing: 20,
+        runSpacing: 20,
         children: [
           _buildSummaryChip(
             "စုစုပေါင်းငွေ",
@@ -447,27 +461,31 @@ class _ReportsScreen extends State<ReportsScreen> {
     return Column(
       children: [
         // ၁။ Fixed Header အပိုင်း (ဒီကောင်က Scroll မဖြစ်ပါ)
-        Container(
-          decoration: BoxDecoration(
-            color: headerColor,
-            border: Border.all(
-              color: (isDark ? Colors.white : Colors.teal).withOpacity(0.2),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Container(
+            width: 1200,
+            decoration: BoxDecoration(
+              color: headerColor,
+              border: Border.all(
+                color: (isDark ? Colors.white : Colors.teal).withOpacity(0.2),
+              ),
             ),
-          ),
-          padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 8),
-          child: Row(
-            children: [
-              _buildHeaderCell('No', 1, textColor),
-              _buildHeaderCell('Voucher No', 2, textColor),
-              _buildHeaderCell('Fuel Type', 2, textColor),
-              _buildHeaderCell('Price', 2, textColor),
-              _buildHeaderCell('Date & Time', 3, textColor),
-              _buildHeaderCell('Vehicle No', 2, textColor),
-              _buildHeaderCell('Sale Type', 2, textColor),
-              _buildHeaderCell('Liter', 2, textColor),
-              _buildHeaderCell('Amount', 2, textColor),
-              _buildHeaderCell('Action', 2, textColor),
-            ],
+            padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 8),
+            child: Row(
+              children: [
+                _buildHeaderCell('No', 1, textColor),
+                _buildHeaderCell('Voucher No', 2, textColor),
+                _buildHeaderCell('Fuel Type', 2, textColor),
+                _buildHeaderCell('Price', 2, textColor),
+                _buildHeaderCell('Date & Time', 3, textColor),
+                _buildHeaderCell('Vehicle No', 2, textColor),
+                _buildHeaderCell('Sale Type', 2, textColor),
+                _buildHeaderCell('Liter', 2, textColor),
+                _buildHeaderCell('Amount', 2, textColor),
+                _buildHeaderCell('Action', 2, textColor),
+              ],
+            ),
           ),
         ),
 
@@ -477,127 +495,133 @@ class _ReportsScreen extends State<ReportsScreen> {
               ? const Center(child: CircularProgressIndicator())
               : data.isEmpty && !isLoading
               ? const Center(child: Text("မှတ်တမ်းမရှိပါ"))
-              : ListView.builder(
-                  itemCount: data.length,
-                  itemBuilder: (context, index) {
-                    final isDark =
-                        Theme.of(context).brightness == Brightness.dark;
-                    final sale = data[index];
-                    final bool isEven = index % 2 == 0;
-                    final Color rowColor = isEven
-                        ? (isDark
-                              ? StyleConstants.darkBg
-                              : Colors.blueGrey.shade50)
-                        : (isDark ? StyleConstants.darkSurface : Colors.white);
-                    return Container(
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 12,
-                        horizontal: 15,
-                      ),
-                      decoration: BoxDecoration(
-                        color: rowColor,
-                        border: Border(
-                          bottom: BorderSide(
-                            color:
-                                (isDark ? Colors.white : Colors.grey.shade300)
-                                    .withOpacity(0.1),
-                          ),
-                          left: BorderSide(
-                            color: Colors.grey.shade300,
-                          ), // ဘယ်ဘက်မျဉ်း
-                          right: BorderSide(
-                            color: Colors.grey.shade300,
-                          ), // ညာဘက်မျဉ်း
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          _buildTableCell(
-                            '${index + 1}',
-                            0,
-                            isText: true,
-                          ), // အမှတ်စဉ်
-                          _buildTableCell(
-                            '${sale['VocNo']}',
-                            2,
-                            isText: true,
-                          ), // Invoice No
-                          dataCell(
-                            "${sale['FuelTypeName']}",
-                            150,
-                            cardColor: getFuelColor(sale['FuelTypeName'] ?? ''),
-                            showRightBorder: true,
-                            alignment: Alignment
-                                .center, // Sale Type Badge ကိုတော့ အလယ်မှာပဲထားမယ်
-                          ),
-                          // ယနေ့ပေါက်ဈေး (D1_FuelType မှလာသော SalePrice)
-                          _buildTableCell(
-                            NumberFormat(
-                              '#,###',
-                            ).format(sale['TodayPrice'] ?? 0),
-                            2,
-                            isNumeric: true,
-                          ),
-                          _buildTableCell(
-                            DateFormat(
-                              'dd-MM-yy HH:mm:ss',
-                            ).format(DateTime.parse(sale['S_Date'])),
-                            3,
-                          ),
-                          _buildTableCell(
-                            '${sale['Vehical_No'] ?? '-'}',
-                            2,
-                            isText: true,
-                          ), // Vehicle No
-                          // _buildTableCell('${sale['Sale_Type_name'] ?? '-'}', 2),
-                          dataCell(
-                            "${sale['Sale_Type_name']}",
-                            100,
-                            cardColor: getSaleTypeColor(
-                              sale['Sale_Type_name'] ?? '',
+              : SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: SizedBox(
+                    width: 1200, // Fixed width for horizontal scrolling
+                    child: ListView.builder(
+                        itemCount: data.length,
+                        itemBuilder: (context, index) {
+                          final isDark =
+                              Theme.of(context).brightness == Brightness.dark;
+                          final sale = data[index];
+                          final bool isEven = index % 2 == 0;
+                          final Color rowColor = isEven
+                              ? (isDark
+                                    ? StyleConstants.darkBg
+                                    : Colors.blueGrey.shade50)
+                              : (isDark ? StyleConstants.darkSurface : Colors.white);
+                          return Container(
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 12,
+                              horizontal: 15,
                             ),
-                            showRightBorder: true,
-                            alignment: Alignment
-                                .center, // Sale Type Badge ကိုတော့ အလယ်မှာပဲထားမယ်
-                          ),
-
-                          _buildTableCell(
-                            '${double.tryParse(sale['SALELITER'].toString())?.toStringAsFixed(2)}',
-                            2,
-                          ),
-                          _buildTableCell(
-                            NumberFormat('#,###').format(
-                              double.tryParse(sale['TotalPrice'].toString()) ??
-                                  0,
+                            decoration: BoxDecoration(
+                              color: rowColor,
+                              border: Border(
+                                bottom: BorderSide(
+                                  color:
+                                      (isDark ? Colors.white : Colors.grey.shade300)
+                                          .withOpacity(0.1),
+                                ),
+                                left: BorderSide(
+                                  color: Colors.grey.shade300,
+                                ), // ဘယ်ဘက်မျဉ်း
+                                right: BorderSide(
+                                  color: Colors.grey.shade300,
+                                ), // ညာဘက်မျဉ်း
+                              ),
                             ),
-                            2,
-                            isNumeric: true,
-                          ),
-                          sale['Sale_Type_name'] == 'Cash Sale' ||
-                                  sale['Sale_Type_name'] == 'ePayment'
-                              ? _buildTableCell(
-                                  CheckAlreadyCollectedReport(sale: sale, supabase: supabase),
+                            child: Row(
+                              children: [
+                                _buildTableCell(
+                                  '${index + 1}',
+                                  1,
+                                  isText: true,
+                                ), // အမှတ်စဉ်
+                                _buildTableCell(
+                                  '${sale['VocNo']}',
                                   2,
-                                  isAction: true,
-                                )
-                              : _buildTableCell(
-                                  IconButton(
-                                    onPressed: null,
-                                    icon: const Icon(
-                                      Icons.not_interested_rounded,
-                                      size: 20,
-                                      color: Colors.red,
-                                    ),
-                                    tooltip:
-                                        '${sale['Sale_Type_name']} အတွက် ခွင့်မပြုပါ',
+                                  isText: true,
+                                ), // Invoice No
+                                dataCell(
+                                  "${sale['FuelTypeName']}",
+                                  150,
+                                  cardColor: getFuelColor(sale['FuelTypeName'] ?? ''),
+                                  showRightBorder: true,
+                                  alignment: Alignment
+                                      .center, // Sale Type Badge ကိုတော့ အလယ်မှာပဲထားမယ်
+                                ),
+                                // ယနေ့ပေါက်ဈေး (D1_FuelType မှလာသော SalePrice)
+                                _buildTableCell(
+                                  NumberFormat(
+                                    '#,###',
+                                  ).format(sale['TodayPrice'] ?? 0),
+                                  2,
+                                  isNumeric: true,
+                                ),
+                                _buildTableCell(
+                                  DateFormat(
+                                    'dd-MM-yy HH:mm:ss',
+                                  ).format(DateTime.parse(sale['S_Date'])),
+                                  3,
+                                ),
+                                _buildTableCell(
+                                  '${sale['Vehical_No'] ?? '-'}',
+                                  2,
+                                  isText: true,
+                                ), // Vehicle No
+                                // _buildTableCell('${sale['Sale_Type_name'] ?? '-'}', 2),
+                                dataCell(
+                                  "${sale['Sale_Type_name']}",
+                                  150,
+                                  cardColor: getSaleTypeColor(
+                                    sale['Sale_Type_name'] ?? '',
+                                  ),
+                                  showRightBorder: true,
+                                  alignment: Alignment
+                                      .center, // Sale Type Badge ကိုတော့ အလယ်မှာပဲထားမယ်
+                                ),
+      
+                                _buildTableCell(
+                                  '${double.tryParse(sale['SALELITER'].toString())?.toStringAsFixed(2)}',
+                                  2,
+                                ),
+                                _buildTableCell(
+                                  NumberFormat('#,###').format(
+                                    double.tryParse(sale['TotalPrice'].toString()) ??
+                                        0,
                                   ),
                                   2,
-                                  isAction: true,
+                                  isNumeric: true,
                                 ),
-                        ],
+                                sale['Sale_Type_name'] == 'Cash Sale' ||
+                                        sale['Sale_Type_name'] == 'ePayment'
+                                    ? _buildTableCell(
+                                        CheckAlreadyCollectedReport(sale: sale, supabase: supabase),
+                                        2,
+                                        isAction: true,
+                                      )
+                                    : _buildTableCell(
+                                        IconButton(
+                                          onPressed: null,
+                                          icon: const Icon(
+                                            Icons.not_interested_rounded,
+                                            size: 20,
+                                            color: Colors.red,
+                                          ),
+                                          tooltip:
+                                              '${sale['Sale_Type_name']} အတွက် ခွင့်မပြုပါ',
+                                        ),
+                                        2,
+                                        isAction: true,
+                                      ),
+                              ],
+                            ),
+                          );
+                        },
                       ),
-                    );
-                  },
+                  ),
                 ),
         ),
       ],
@@ -649,17 +673,17 @@ class _ReportsScreen extends State<ReportsScreen> {
   }
 
   // Sale Type Summary Table
-  Widget _buildTypeSummaryTable() {
+  Widget _buildTypeSummaryTable(bool isMobile) {
     final summaryData = _calculateSalesSummary();
 
     // Amount အလိုက် Sort လုပ်ခြင်း
     final sortedEntries = summaryData.entries.toList()
       ..sort((a, b) => b.value['amount']!.compareTo(a.value['amount']!));
 
-    return SizedBox(
-      width:
-          MediaQuery.of(context).size.width * 0.5 -
-          20, // Screen width ရဲ့ 50% နဲ့ margin ထည့်ခြင်း
+    return Container(
+      width: isMobile 
+          ? double.infinity 
+          : MediaQuery.of(context).size.width * 0.5 - 20,
       child: Card(
         elevation: 4,
         margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -670,8 +694,8 @@ class _ReportsScreen extends State<ReportsScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Divider(height: 20),
-              SizedBox(
-                width: double.infinity,
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
                 child: DataTable(
                   headingRowColor: WidgetStateProperty.all(
                     Colors.teal.withOpacity(0.1),
@@ -680,20 +704,29 @@ class _ReportsScreen extends State<ReportsScreen> {
                     DataColumn(
                       label: Text(
                         'Sale Type',
-                        style: TextStyle(fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
                       ),
                     ),
                     DataColumn(
                       label: Text(
                         'Total Liter',
-                        style: TextStyle(fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
                       ),
                       numeric: true,
                     ),
                     DataColumn(
                       label: Text(
                         'Total Amount',
-                        style: TextStyle(fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
                       ),
                       numeric: true,
                     ),
@@ -707,12 +740,16 @@ class _ReportsScreen extends State<ReportsScreen> {
                             style: const TextStyle(
                               color: Colors.blueGrey,
                               fontWeight: FontWeight.w500,
+                              fontSize: 12,
                             ),
                           ),
                         ),
                         // Liter ကို ဒသမ ၂ လုံးဖြင့်ပြသခြင်း
                         DataCell(
-                          Text(entry.value['liters']!.toStringAsFixed(2)),
+                          Text(
+                            entry.value['liters']!.toStringAsFixed(2),
+                            style: const TextStyle(fontSize: 12),
+                          ),
                         ),
                         // Amount ကို ပုဒ်ဖြတ်ကော်မာဖြင့်ပြသခြင်း
                         DataCell(
@@ -721,6 +758,7 @@ class _ReportsScreen extends State<ReportsScreen> {
                             style: const TextStyle(
                               fontWeight: FontWeight.bold,
                               color: Colors.teal,
+                              fontSize: 12,
                             ),
                           ),
                         ),
@@ -737,17 +775,17 @@ class _ReportsScreen extends State<ReportsScreen> {
   }
 
   // Fuel Summary Table
-  Widget _buildFuelSummaryTable() {
+  Widget _buildFuelSummaryTable(bool isMobile) {
     final fuelData = _calculateFuelSummary();
 
     // Amount အလိုက် အများဆုံးမှ အနည်းဆုံးသို့ Sort လုပ်ခြင်း
     final sortedFuelEntries = fuelData.entries.toList()
       ..sort((a, b) => b.value['amount']!.compareTo(a.value['amount']!));
 
-    return SizedBox(
-      width:
-          MediaQuery.of(context).size.width * 0.5 -
-          20, // Screen width ရဲ့ 50% နဲ့ margin ထည့်ခြင်း
+    return Container(
+      width: isMobile 
+          ? double.infinity 
+          : MediaQuery.of(context).size.width * 0.5 - 20,
       child: Card(
         elevation: 4,
         margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -758,8 +796,8 @@ class _ReportsScreen extends State<ReportsScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Divider(height: 20),
-              SizedBox(
-                width: double.infinity,
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
                 child: DataTable(
                   horizontalMargin: 10,
                   columnSpacing: 20,
@@ -770,20 +808,29 @@ class _ReportsScreen extends State<ReportsScreen> {
                     DataColumn(
                       label: Text(
                         'Fuel Type',
-                        style: TextStyle(fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
                       ),
                     ),
                     DataColumn(
                       label: Text(
                         'Total Liter',
-                        style: TextStyle(fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
                       ),
                       numeric: true,
                     ),
                     DataColumn(
                       label: Text(
                         'Total Amount',
-                        style: TextStyle(fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
                       ),
                       numeric: true,
                     ),
@@ -797,12 +844,16 @@ class _ReportsScreen extends State<ReportsScreen> {
                             style: const TextStyle(
                               color: Colors.blueGrey,
                               fontWeight: FontWeight.bold,
+                              fontSize: 12,
                             ),
                           ),
                         ),
                         // Liter ကို ဒသမ ၂ လုံးဖြင့်ပြသခြင်း
                         DataCell(
-                          Text(entry.value['liters']!.toStringAsFixed(2)),
+                          Text(
+                            entry.value['liters']!.toStringAsFixed(2),
+                            style: const TextStyle(fontSize: 12),
+                          ),
                         ),
                         DataCell(
                           Text(
@@ -810,6 +861,7 @@ class _ReportsScreen extends State<ReportsScreen> {
                             style: const TextStyle(
                               fontWeight: FontWeight.bold,
                               color: Colors.deepOrange,
+                              fontSize: 12,
                             ),
                           ),
                         ),
@@ -820,6 +872,57 @@ class _ReportsScreen extends State<ReportsScreen> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMobileShowDetailButton(List<dynamic> data) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.list_alt_rounded, size: 64, color: Colors.teal.withOpacity(0.5)),
+            const SizedBox(height: 16),
+            Text(
+              "${data.length} Records Found",
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              "Tap below to see full details with search & filters",
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ReportDetailListScreen(
+                        salesData: data,
+                        supabase: supabase,
+                      ),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.rocket_launch_rounded),
+                label: const Text("SHOW FULL DETAILS"),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.teal,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 18),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  elevation: 4,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -1053,192 +1156,132 @@ class _ReportsScreen extends State<ReportsScreen> {
   }
 
   // Date Search Row
-  Widget _buildDateSearchRow(List<dynamic> data) {
+  Widget _buildDateSearchRow(bool isMobile, List<dynamic> data) {
+    if (isMobile) {
+      return _buildMobileSelectionView(data);
+    }
+
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      padding: const EdgeInsets.only(right: 12, top: 10, bottom: 10, left: 12),
+      padding: const EdgeInsets.all(12),
       color: isDark ? Colors.blueGrey.shade900 : Colors.blueGrey.shade50,
-      child: Row(
+      child: Wrap(
+        alignment: WrapAlignment.spaceBetween,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: 16,
+        runSpacing: 16,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              //START Date & Time
-              Row(
-                children: [
-                  _dateTextField(_startDateController, "From Date"),
-                  _timeTextField(_startTimeController, "Start Time"),
-                ],
-              ),
+          _buildMobileDatePickers(isMobile),
+          _buildSearchButtons(isMobile),
+          _buildReportButtons(isMobile),
+          _buildRecordSummary(data, isMobile),
+        ],
+      ),
+    );
+  }
 
-              const SizedBox(width: 10),
-              const Text(" TO ", style: TextStyle(color: Colors.grey)),
-              const SizedBox(width: 10),
-              //END Date & Time
-              Row(
-                children: [
-                  _dateTextField(_endDateController, "To Date"),
-                  _timeTextField(_endTimeController, "End Time"),
-                ],
-              ),
-            ],
+  Widget _buildMobileSelectionView(List<dynamic> data) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? StyleConstants.darkBg : Colors.white,
+      ),
+      child: Column(
+        children: [
+          GlassContainer(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                _buildDateTimeSegment(
+                  title: "START",
+                  dateController: _startDateController,
+                  timeController: _startTimeController,
+                  icon: Icons.play_circle_outline,
+                  color: Colors.green,
+                ),
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Row(
+                    children: [
+                      Expanded(child: Divider()),
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 12),
+                        child: Icon(Icons.arrow_downward, size: 16, color: Colors.grey),
+                      ),
+                      Expanded(child: Divider()),
+                    ],
+                  ),
+                ),
+                _buildDateTimeSegment(
+                  title: "END",
+                  dateController: _endDateController,
+                  timeController: _endTimeController,
+                  icon: Icons.stop_circle_outlined,
+                  color: Colors.redAccent,
+                ),
+              ],
+            ),
           ),
-          SizedBox(width: 10),
-          Column(
-            children: [
-              // --- Search Button ---
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  foregroundColor: Colors.teal,
-                ),
-                onPressed: () async {
-                  // TextField မှ အချိန်များကို ယူပြီး DateTime ပြုလုပ်ခြင်း
-                  final start = _combineDateAndTime(
-                    _selectedDateRange!.start,
-                    _startTimeController.text,
-                  );
-                  final end = _combineDateAndTime(
-                    _selectedDateRange!.end,
-                    _endTimeController.text,
-                  );
-
-                  print("Start: $start, End: $end");
-                  await _searchSalesByDate(start, end);
-                },
-                child: Row(
-                  children: [
-                    Icon(Icons.search),
-                    SizedBox(width: 8),
-                    Text("Search"),
-                  ],
-                ),
-              ),
-              SizedBox(height: 10),
-              // --- Search Button ---
-              ElevatedButton(
-                onPressed: () async {
-                  await _fetchLatestSales();
-                },
-                style: ElevatedButton.styleFrom(
-                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-                  backgroundColor: Colors.teal,
-                  foregroundColor: Colors.white,
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.receipt_long_rounded),
-                    SizedBox(width: 8),
-                    Text("Last 20 Sales"),
-                  ],
-                ),
-              ),
-            ],
-          ),
-
-          SizedBox(width: 10),
-          Spacer(),
-
+          const SizedBox(height: 20),
           Row(
             children: [
-              Column(
-                children: [
-                  ElevatedButton(
-                    onPressed: () async {
-                      // ၁။ Loading ကို အစမှာတင် တန်းဖွင့်လိုက်မယ်
-                      salesStreamController.add(
-                        SalesLoadStatus(
-                          data: [],
-                          progress: 0.0,
-                          isLoading: true,
-                        ),
-                      );
-
-                      try {
-                        // ၄။ Excel ထုတ်မယ်
-                        await exportSaleDetailReport(
-                          List<Map<String, dynamic>>.from(_salesData),
-                        );
-                      } catch (e) {
-                        print("Error: $e");
-                        // Error တက်ရင်လည်း Loading ပိတ်ပေးဖို့လိုတယ်
-                      } finally {
-                        // ၅။ အားလုံးပြီးသွားပြီ (သို့မဟုတ်) Error တက်သွားပြီဆိုရင် Loading ပြန်ပိတ်မယ်
-                        salesStreamController.add(
-                          SalesLoadStatus(
-                            data: _salesData,
-                            progress: 1.0,
-                            isLoading: false,
-                          ),
-                        );
-                      }
-                    },
-                    child: Row(
-                      children: [
-                        Icon(Icons.data_thresholding_rounded),
-                        SizedBox(width: 8),
-                        Text("Sale Detail Report"),
-                      ],
-                    ),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    final start = _combineDateAndTime(_selectedDateRange!.start, _startTimeController.text);
+                    final end = _combineDateAndTime(_selectedDateRange!.end, _endTimeController.text);
+                    await _searchSalesByDate(start, end);
+                  },
+                  icon: const Icon(Icons.search),
+                  label: const Text("SEARCH NOW"),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.teal,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 15),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
-                  SizedBox(height: 10),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
-                      foregroundColor: Colors.white,
-                    ),
-                    onPressed: () {
-                      // List<SaleData> salesList = _salesData.map((x) => SaleData.fromMap(x)).toList();
-                      exportSaleDataReport(
-                        _salesData.toList(),
-                        AppConfig.stationName,
-                        "${DateFormat('dd-MM-yyyy').format(_selectedDateRange!.start)} ${_startTimeController.text}",
-                        "${DateFormat('dd-MM-yyyy').format(_selectedDateRange!.end)} ${_endTimeController.text}",
-                      );
-                    },
-                    child: Row(
-                      children: [
-                        Icon(Icons.data_thresholding_rounded),
-                        SizedBox(width: 8),
-                        Text("Sale Summary Report"),
-                      ],
-                    ),
-                  ),
-                  SizedBox(height: 10),
-                ],
+                ),
               ),
-              SizedBox(width: 10),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      SizedBox(width: 50, child: const Text("From ")),
-                      Text(":  "),
-                      Text(
-                        "${DateFormat('dd-MM-yyyy').format(_selectedDateRange!.start)} ${_startTimeController.text}",
-                      ),
-                    ],
+              const SizedBox(width: 12),
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.teal.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: IconButton(
+                  onPressed: _fetchLatestSales,
+                  icon: const Icon(Icons.history, color: Colors.teal),
+                  tooltip: "Latest 20",
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => _exportDetail(),
+                  icon: const Icon(Icons.description_outlined, size: 18),
+                  label: const Text("DETAIL"),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
-                  const SizedBox(width: 10),
-                  Row(
-                    children: [
-                      SizedBox(width: 50, child: const Text("To ")),
-                      Text(":  "),
-                      Text(
-                        "${DateFormat('dd-MM-yyyy').format(_selectedDateRange!.end)} ${_endTimeController.text}",
-                      ),
-                    ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => _exportSummary(),
+                  icon: const Icon(Icons.summarize_outlined, size: 18),
+                  label: const Text("SUMMARY"),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
-
-                  Row(
-                    children: [
-                      SizedBox(width: 50, child: Text("Record")),
-                      Text(":  "),
-                      Text("${data.length}"),
-                    ],
-                  ),
-                ],
+                ),
               ),
             ],
           ),
@@ -1246,6 +1289,227 @@ class _ReportsScreen extends State<ReportsScreen> {
       ),
     );
   }
+
+  Widget _buildDateTimeSegment({
+    required String title,
+    required TextEditingController dateController,
+    required TextEditingController timeController,
+    required IconData icon,
+    required Color color,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, color: color, size: 24),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: color, letterSpacing: 1.2)),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: InkWell(
+                      onTap: () => _pickDateForController(dateController, title == "START"),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text("DATE", style: TextStyle(fontSize: 9, color: Colors.grey)),
+                          Text(dateController.text, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Container(width: 1, height: 25, color: Colors.grey.withOpacity(0.2), margin: const EdgeInsets.symmetric(horizontal: 12)),
+                  Expanded(
+                    flex: 2,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text("TIME", style: TextStyle(fontSize: 9, color: Colors.grey)),
+                        SizedBox(
+                          height: 25,
+                          child: TextField(
+                            controller: timeController,
+                            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                            decoration: const InputDecoration(
+                              isDense: true,
+                              border: InputBorder.none,
+                              contentPadding: EdgeInsets.zero,
+                            ),
+                            keyboardType: TextInputType.number,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _pickDateForController(TextEditingController controller, bool isStart) async {
+    DateTime initial = isStart ? _selectedDateRange!.start : _selectedDateRange!.end;
+    DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2030),
+    );
+    if (picked != null) {
+      setState(() {
+        if (isStart) {
+          _selectedDateRange = DateTimeRange(start: picked, end: _selectedDateRange!.end);
+        } else {
+          _selectedDateRange = DateTimeRange(start: _selectedDateRange!.start, end: picked);
+        }
+        controller.text = DateFormat("dd-MM-yyyy").format(picked);
+      });
+    }
+  }
+
+  Widget _buildMobileDatePickers(bool isMobile) {
+    return Column(
+      crossAxisAlignment: isMobile ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          alignment: WrapAlignment.center,
+          children: [
+            _dateTextField(_startDateController, "From Date"),
+            _timeTextField(_startTimeController, "Start Time"),
+          ],
+        ),
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: 4),
+          child: Text(" TO ", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+        ),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          alignment: WrapAlignment.center,
+          children: [
+            _dateTextField(_endDateController, "To Date"),
+            _timeTextField(_endTimeController, "End Time"),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSearchButtons(bool isMobile) {
+    return Column(
+      children: [
+        ElevatedButton.icon(
+          onPressed: () async {
+            final start = _combineDateAndTime(_selectedDateRange!.start, _startTimeController.text);
+            final end = _combineDateAndTime(_selectedDateRange!.end, _endTimeController.text);
+            await _searchSalesByDate(start, end);
+          },
+          icon: const Icon(Icons.search),
+          label: const Text("Search"),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.white,
+            foregroundColor: Colors.teal,
+            minimumSize: const Size(160, 45),
+          ),
+        ),
+        const SizedBox(height: 10),
+        ElevatedButton.icon(
+          onPressed: _fetchLatestSales,
+          icon: const Icon(Icons.receipt_long_rounded),
+          label: const Text("Last 20 Sales"),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.teal,
+            foregroundColor: Colors.white,
+            minimumSize: const Size(160, 45),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildReportButtons(bool isMobile) {
+    return Column(
+      children: [
+        ElevatedButton.icon(
+          onPressed: () => _exportDetail(),
+          icon: const Icon(Icons.description),
+          label: const Text("Detail Report"),
+          style: ElevatedButton.styleFrom(minimumSize: const Size(180, 45)),
+        ),
+        const SizedBox(height: 10),
+        ElevatedButton.icon(
+          onPressed: () => _exportSummary(),
+          icon: const Icon(Icons.summarize),
+          label: const Text("Summary Report"),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.blue,
+            foregroundColor: Colors.white,
+            minimumSize: const Size(180, 45),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _exportDetail() async {
+    salesStreamController.add(SalesLoadStatus(data: _salesData, progress: 0.0, isLoading: true));
+    try {
+      await exportSaleDetailReport(List<Map<String, dynamic>>.from(_salesData));
+    } finally {
+      salesStreamController.add(SalesLoadStatus(data: _salesData, progress: 1.0, isLoading: false));
+    }
+  }
+
+  void _exportSummary() {
+    exportSaleDataReport(
+      _salesData.toList(),
+      AppConfig.stationName,
+      "${DateFormat('dd-MM-yyyy').format(_selectedDateRange!.start)} ${_startTimeController.text}",
+      "${DateFormat('dd-MM-yyyy').format(_selectedDateRange!.end)} ${_endTimeController.text}",
+    );
+  }
+
+  Widget _buildRecordSummary(List<dynamic> data, bool isMobile) {
+    return Column(
+      crossAxisAlignment: isMobile ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+      children: [
+        _infoRow("From", "${DateFormat('dd-MM-yyyy').format(_selectedDateRange!.start)} ${_startTimeController.text}"),
+        _infoRow("To", "${DateFormat('dd-MM-yyyy').format(_selectedDateRange!.end)} ${_endTimeController.text}"),
+        _infoRow("Record", "${data.length}"),
+      ],
+    );
+  }
+
+  Widget _infoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(width: 50, child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold))),
+          Text(":  $value"),
+        ],
+      ),
+    );
+  }
+
 
   // Date Text Field
   Widget _dateTextField(TextEditingController controller, String label) {
@@ -1274,8 +1538,8 @@ class _ReportsScreen extends State<ReportsScreen> {
           tooltip: "From Date",
         ),
         const SizedBox(width: 8),
-        SizedBox(
-          width: 150,
+        Container(
+          width: 110,
           child: TextField(
             controller: controller,
             decoration: InputDecoration(
@@ -1284,6 +1548,7 @@ class _ReportsScreen extends State<ReportsScreen> {
               hintText: "dd-mm-yyyy",
               border: const OutlineInputBorder(),
               counterText: "",
+              contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
             ),
             keyboardType: TextInputType.number,
             onChanged: (value) {
@@ -1356,6 +1621,7 @@ class _ReportsScreen extends State<ReportsScreen> {
               isDense: true,
               hintText: "00:00:00",
               border: const OutlineInputBorder(),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
             ),
             keyboardType: TextInputType.number,
             onChanged: (value) {
@@ -1421,46 +1687,3 @@ class _ReportsScreen extends State<ReportsScreen> {
   }
 }
 
-class CheckAlreadyCollectedReport extends StatelessWidget {
-  final Map<String, dynamic> sale;
-  final SupabaseClient supabase;
-
-  const CheckAlreadyCollectedReport({
-    super.key,
-    required this.sale,
-    required this.supabase,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    // Report screen မှာ data က VocNo ပဲပါတယ်။ fullVocNo က station prefix လိုတယ်။
-    final String fullVocNo = "${AppConfig.stationId}${sale['VocNo']}";
-    return StreamBuilder<bool>(
-      stream: checkIfExistsStream(fullVocNo),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const SizedBox(
-            width: 14,
-            height: 14,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          );
-        }
-        if (snapshot.data == true) {
-          return const Tooltip(
-            message: "Point Collect လုပ်ပြီးပါပြီ",
-            child: Icon(Icons.check_circle_rounded, color: Colors.green, size: 24),
-          );
-        }
-
-        return TextFieldDialog(
-          supabase: supabase,
-          voc_no: sale['VocNo'],
-          vehical_no: sale['Vehical_No'] ?? '',
-          fuel_type: sale['FuelTypeName'] ?? '',
-          amount: sale['TotalPrice']?.toString() ?? '0',
-          sale_type: sale['Sale_Type_name'] ?? '',
-        );
-      },
-    );
-  }
-}

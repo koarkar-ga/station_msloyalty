@@ -38,62 +38,118 @@ class _RewardPointScreenState extends State<RewardPointScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      appBar: MsAppBar(
-        title: "Reward Points Management",
-        showBackButton: true,
-      ),
+      appBar: MsAppBar(title: "Reward Points Management", showBackButton: true),
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: isDark 
-              ? [StyleConstants.darkBg, const Color(0xFF1E293B)]
-              : [StyleConstants.lightBg, const Color(0xFFE2E8F0)],
+            colors: isDark
+                ? [StyleConstants.darkBg, const Color(0xFF1E293B)]
+                : [StyleConstants.lightBg, const Color(0xFFE2E8F0)],
           ),
         ),
-        child: Row(
-          children: [
-            // --- Left Panel: Reward Catalog ---
-            Expanded(
-              flex: 7,
-              child: Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: Column(
-                  children: [
-                    _buildGlassHeader("Reward Catalog", Icons.grid_view_rounded, context),
-                    const SizedBox(height: 16),
-                    Expanded(
-                      child: GlassContainer(
-                        child: buildRewardGridView(),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    _buildQRScanAction(context),
-                  ],
-                ),
-              ),
-            ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isMobile = constraints.maxWidth < 1000;
 
-            // --- Right Panel: Recent Redemptions ---
-            Expanded(
-              flex: 3,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(0, 24, 24, 24),
-                child: Column(
-                  children: [
-                    _buildGlassHeader("Recent Activity", Icons.history_rounded, context),
-                    const SizedBox(height: 16),
-                    Expanded(
-                      child: GlassContainer(
-                        child: const RedemptionHistoryList(),
-                      ),
+            if (isMobile) {
+              return Stack(
+                children: [
+                  SingleChildScrollView(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      children: [
+                        // --- Top Section: Reward Catalog ---
+                        _buildGlassHeader(
+                          "Reward Catalog",
+                          Icons.grid_view_rounded,
+                          context,
+                        ),
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          height:
+                              500, // Fixed height for grid on scrollable mobile view
+                          child: GlassContainer(child: buildRewardGridView()),
+                        ),
+                        const SizedBox(height: 24),
+                        // --- Bottom Section: Recent Redemptions ---
+                        _buildGlassHeader(
+                          "Recent Activity",
+                          Icons.history_rounded,
+                          context,
+                        ),
+                        const SizedBox(height: 16),
+                        // We use a fixed height or Wrap to avoid overflow in SingleChildScrollView
+                        Container(
+                          height: 400,
+                          child: GlassContainer(
+                            child: const RedemptionHistoryList(),
+                          ),
+                        ),
+                        const SizedBox(height: 80), // Space for FAB
+                      ],
                     ),
-                  ],
+                  ),
+                  Positioned(
+                    bottom: 20,
+                    right: 20,
+                    child: _buildQRScanAction(context),
+                  ),
+                ],
+              );
+            }
+
+            return Row(
+              children: [
+                // --- Left Panel: Reward Catalog ---
+                Expanded(
+                  flex: 7,
+                  child: Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      children: [
+                        _buildGlassHeader(
+                          "Reward Catalog",
+                          Icons.grid_view_rounded,
+                          context,
+                        ),
+                        const SizedBox(height: 16),
+                        Expanded(
+                          child: GlassContainer(child: buildRewardGridView()),
+                        ),
+                        const SizedBox(height: 16),
+                        _buildQRScanAction(context),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-            ),
-          ],
+
+                // --- Right Panel: Recent Redemptions ---
+                Expanded(
+                  flex: 3,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(0, 24, 24, 24),
+                    child: Column(
+                      children: [
+                        _buildGlassHeader(
+                          "Recent Activity",
+                          Icons.history_rounded,
+                          context,
+                        ),
+                        const SizedBox(height: 16),
+                        Expanded(
+                          child: GlassContainer(
+                            child: const RedemptionHistoryList(),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -107,7 +163,13 @@ class _RewardPointScreenState extends State<RewardPointScreen> {
       borderRadius: 16,
       child: Row(
         children: [
-          Icon(icon, color: isDark ? StyleConstants.darkAccent : StyleConstants.lightAccent, size: 22),
+          Icon(
+            icon,
+            color: isDark
+                ? StyleConstants.darkAccent
+                : StyleConstants.lightAccent,
+            size: 22,
+          ),
           const SizedBox(width: 12),
           Text(
             title.toUpperCase(),
@@ -129,7 +191,9 @@ class _RewardPointScreenState extends State<RewardPointScreen> {
       alignment: Alignment.bottomRight,
       child: FloatingActionButton.extended(
         onPressed: _showQRScannerDialog,
-        backgroundColor: isDark ? StyleConstants.darkAccent : StyleConstants.lightAccent,
+        backgroundColor: isDark
+            ? StyleConstants.darkAccent
+            : StyleConstants.lightAccent,
         foregroundColor: isDark ? Colors.black : Colors.white,
         elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -143,12 +207,13 @@ class _RewardPointScreenState extends State<RewardPointScreen> {
   }
 
   void _showQRScannerDialog() {
+    final bool isMobile = MediaQuery.of(context).size.width < 750;
     showDialog(
       context: context,
       barrierDismissible: true,
       builder: (context) {
         return RewardQrScannerDialog(
-          useCameraScanner: _useCameraScanner,
+          useCameraScanner: _useCameraScanner || isMobile,
           onScan: (qrData) {
             Navigator.pop(context);
             _processRedemption(qrData);
@@ -158,7 +223,12 @@ class _RewardPointScreenState extends State<RewardPointScreen> {
     );
   }
 
-  Future<void> redeemReward(String userId, int rewardId, int requiredPoints, {String? tokenId}) async {
+  Future<void> redeemReward(
+    String userId,
+    int rewardId,
+    int requiredPoints, {
+    String? tokenId,
+  }) async {
     try {
       BotToast.showLoading();
       await Supabase.instance.client.rpc(
@@ -176,11 +246,12 @@ class _RewardPointScreenState extends State<RewardPointScreen> {
             .update({'is_used': true})
             .eq('id', tokenId);
       }
-      
+
       // Log Reward Redemption Activity
       await ActivityService.logActivity(
         actionType: 'redeem_reward',
-        description: 'Redeemed Reward (ID: $rewardId) for Points: $requiredPoints',
+        description:
+            'Redeemed Reward (ID: $rewardId) for Points: $requiredPoints',
         metadata: {
           'reward_id': rewardId,
           'member_uid': userId,
@@ -276,7 +347,7 @@ class _RewardPointScreenState extends State<RewardPointScreen> {
         }
         String userId = tokenResponse['user_id'];
         int rewardId = tokenResponse['reward_id'];
-        
+
         // Safely extract points_required whether Supabase returns a Map or a List
         int pointsRequired = 0;
         var gcData = tokenResponse['gift_cards'];
@@ -285,7 +356,7 @@ class _RewardPointScreenState extends State<RewardPointScreen> {
         } else if (gcData is List && gcData.isNotEmpty) {
           pointsRequired = gcData[0]['points_required'] ?? 0;
         }
-        
+
         await redeemReward(userId, rewardId, pointsRequired, tokenId: tokenId);
         return;
       }

@@ -101,85 +101,91 @@ class _LoginPageState extends State<LoginPage> {
             // Subtle patterns or background images can be added here
             Center(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: GlassContainer(
-                  padding: const EdgeInsets.all(48),
-                  width: 480,
-                  borderRadius: 32,
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Hero(
-                          tag: 'logo',
-                          child: Image.asset('assets/images/moonsun_logo.png', width: 100, height: 100),
-                        ),
-                        const SizedBox(height: 32),
-                        Text(
-                          "STATION PORTAL",
-                          style: GoogleFonts.outfit(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w900,
-                            color: isDark ? Colors.white24 : Colors.black26,
-                            letterSpacing: 4,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          "Sign In to Station",
-                          style: GoogleFonts.outfit(
-                            fontSize: 32,
-                            fontWeight: FontWeight.bold,
-                            color: isDark ? Colors.white : StyleConstants.lightText,
-                          ),
-                        ),
-                        const SizedBox(height: 48),
-
-                        _buildTextField(
-                          controller: _usernameController,
-                          label: "Username",
-                          icon: Icons.person_outline_rounded,
-                          isDark: isDark,
-                          validator: (v) => v!.isEmpty ? "Enter username" : null,
-                        ),
-                        const SizedBox(height: 24),
-
-                        _buildTextField(
-                          controller: _passwordController,
-                          label: "Password",
-                          icon: Icons.lock_outline_rounded,
-                          isPassword: true,
-                          isPasswordVisible: _isPasswordVisible,
-                          isDark: isDark,
-                          onTogglePassword: () => setState(() => _isPasswordVisible = !_isPasswordVisible),
-                          validator: (v) => v!.isEmpty ? "Enter password" : null,
-                          onFieldSubmitted: (v) => _handleLogin(),
-                        ),
-                        const SizedBox(height: 48),
-
-                        SizedBox(
-                          width: double.infinity,
-                          height: 60,
-                          child: ElevatedButton(
-                            onPressed: _isLoading ? null : _handleLogin,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: isDark ? StyleConstants.darkAccent : StyleConstants.lightAccent,
-                              foregroundColor: isDark ? Colors.black : Colors.white,
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                padding: EdgeInsets.symmetric(horizontal: MediaQuery.of(context).size.width < 600 ? 16 : 24),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isSmall = MediaQuery.of(context).size.width < 600;
+                    return GlassContainer(
+                      padding: EdgeInsets.all(isSmall ? 24 : 48),
+                      width: isSmall ? double.infinity : 480,
+                      borderRadius: 32,
+                      child: Form(
+                        key: _formKey,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Hero(
+                              tag: 'logo',
+                              child: Image.asset('assets/images/moonsun_logo.png', width: isSmall ? 80 : 100, height: isSmall ? 80 : 100),
                             ),
-                            child: _isLoading
-                                ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
-                                : Text(
-                                    "AUTHORIZE & SIGN IN",
-                                    style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 1.2),
-                                  ),
-                          ),
+                            SizedBox(height: isSmall ? 24 : 32),
+                            Text(
+                              "STATION PORTAL",
+                              style: GoogleFonts.outfit(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w900,
+                                color: isDark ? Colors.white24 : Colors.black26,
+                                letterSpacing: 4,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              "Sign In to Station",
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.outfit(
+                                fontSize: isSmall ? 24 : 32,
+                                fontWeight: FontWeight.bold,
+                                color: isDark ? Colors.white : StyleConstants.lightText,
+                              ),
+                            ),
+                            SizedBox(height: isSmall ? 32 : 48),
+
+                            _buildTextField(
+                              controller: _usernameController,
+                              label: "Username",
+                              icon: Icons.person_outline_rounded,
+                              isDark: isDark,
+                              validator: (v) => v!.isEmpty ? "Enter username" : null,
+                            ),
+                            const SizedBox(height: 24),
+
+                            _buildTextField(
+                              controller: _passwordController,
+                              label: "Password",
+                              icon: Icons.lock_outline_rounded,
+                              isPassword: true,
+                              isPasswordVisible: _isPasswordVisible,
+                              isDark: isDark,
+                              onTogglePassword: () => setState(() => _isPasswordVisible = !_isPasswordVisible),
+                              validator: (v) => v!.isEmpty ? "Enter password" : null,
+                              onFieldSubmitted: (v) => _handleLogin(),
+                            ),
+                            SizedBox(height: isSmall ? 32 : 48),
+
+                            SizedBox(
+                              width: double.infinity,
+                              height: 60,
+                              child: ElevatedButton(
+                                onPressed: _isLoading ? null : _handleLogin,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: isDark ? StyleConstants.darkAccent : StyleConstants.lightAccent,
+                                  foregroundColor: isDark ? Colors.black : Colors.white,
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                ),
+                                child: _isLoading
+                                    ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
+                                    : Text(
+                                        "AUTHORIZE & SIGN IN",
+                                        style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 1.2),
+                                      ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                  ),
+                      ),
+                    );
+                  }
                 ),
               ),
             ),

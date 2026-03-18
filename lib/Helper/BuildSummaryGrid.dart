@@ -29,19 +29,18 @@ class _SummaryGridWidgetState extends State<SummaryGridWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 700;
+
     return GridView.count(
-      crossAxisCount: 2,
-      childAspectRatio: 1.5,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisCount: isMobile ? 1 : 2,
+      childAspectRatio: isMobile ? 1.8 : 1.5,
       mainAxisSpacing: 20,
       crossAxisSpacing: 20,
       padding: const EdgeInsets.all(20),
       children: [
-        // ၁။ Sale Type Summary (From Node.js API)
-        // _buildFutureChart("Sale Type Summary", _getSaleTypeData()),
-
-        // ၂။ Fuel Sale Summary (From Node.js API)
-        // _buildFutureChart("Fuel Sale Summary", _getFuelSaleData()),
-
         // ၄။ Redemption Summary (From Supabase)
         _buildFutureChart("Redemption Summary", _redemptionFuture, context),
 
@@ -78,7 +77,11 @@ Widget _buildFutureChart(
   );
 }
 
-Widget _buildErrorTile(String title, String errorMessage, BuildContext context) {
+Widget _buildErrorTile(
+  String title,
+  String errorMessage,
+  BuildContext context,
+) {
   final isDark = Theme.of(context).brightness == Brightness.dark;
   return Container(
     padding: const EdgeInsets.all(15),
@@ -163,7 +166,11 @@ Widget _buildEmptyTile(String title, BuildContext context) {
   );
 }
 
-Widget _buildPieChartTile(String title, List<PieChartSectionData> sections, BuildContext context) {
+Widget _buildPieChartTile(
+  String title,
+  List<PieChartSectionData> sections,
+  BuildContext context,
+) {
   final isDark = Theme.of(context).brightness == Brightness.dark;
   return Container(
     padding: const EdgeInsets.all(15),
@@ -188,7 +195,9 @@ Widget _buildPieChartTile(String title, List<PieChartSectionData> sections, Buil
                 flex: 2,
                 child: PieChart(
                   PieChartData(
-                    pieTouchData: PieTouchData(enabled: false), // Disable hover effects to prevent mouse tracker crash
+                    pieTouchData: PieTouchData(
+                      enabled: false,
+                    ), // Disable hover effects to prevent mouse tracker crash
                     sections: sections,
                     centerSpaceRadius: 30, // အလယ်က အပေါက်
                     sectionsSpace: 2,
@@ -198,12 +207,14 @@ Widget _buildPieChartTile(String title, List<PieChartSectionData> sections, Buil
               // Detail Amount (Legend) အပိုင်း
               Expanded(
                 flex: 3,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: sections
-                      .map((data) => _buildLegendItem(data, context))
-                      .toList(),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: sections
+                        .map((data) => _buildLegendItem(data, context))
+                        .toList(),
+                  ),
                 ),
               ),
             ],
@@ -226,7 +237,10 @@ Widget _buildLegendItem(PieChartSectionData data, BuildContext context) {
         Expanded(
           child: Text(
             "${data.title}: ${data.value.toInt()}",
-            style: TextStyle(fontSize: 11, color: isDark ? Colors.white : Colors.black87),
+            style: TextStyle(
+              fontSize: 11,
+              color: isDark ? Colors.white : Colors.black87,
+            ),
             overflow: TextOverflow.ellipsis,
           ),
         ),
@@ -239,7 +253,11 @@ Widget _buildLegendItem(PieChartSectionData data, BuildContext context) {
 Future<List<PieChartSectionData>> _getRedemptionData() async {
   try {
     final now = DateTime.now();
-    final todayStart = DateTime(now.year, now.month, now.day).toUtc().toIso8601String();
+    final todayStart = DateTime(
+      now.year,
+      now.month,
+      now.day,
+    ).toUtc().toIso8601String();
 
     // gift_cards table နဲ့ join ပြီး title တွေပါ တစ်ခါတည်း ယူနိုင်တယ်
     final response = await Supabase.instance.client
@@ -275,7 +293,11 @@ Future<List<PieChartSectionData>> _getRedemptionData() async {
 Future<List<PieChartSectionData>> _getSaleTypeData() async {
   try {
     final now = DateTime.now();
-    final todayStart = DateTime(now.year, now.month, now.day).toUtc().toIso8601String();
+    final todayStart = DateTime(
+      now.year,
+      now.month,
+      now.day,
+    ).toUtc().toIso8601String();
 
     final url = Uri.parse('${AppConfig.apiUrl}/api/summary/saletypes').replace(
       queryParameters: {'stationId': AppConfig.stationId, 'date': todayStart},
@@ -306,7 +328,11 @@ Future<List<PieChartSectionData>> _getSaleTypeData() async {
 Future<List<PieChartSectionData>> _getFuelSaleData() async {
   try {
     final now = DateTime.now();
-    final todayStart = DateTime(now.year, now.month, now.day).toUtc().toIso8601String();
+    final todayStart = DateTime(
+      now.year,
+      now.month,
+      now.day,
+    ).toUtc().toIso8601String();
 
     final url = Uri.parse('${AppConfig.apiUrl}/api/summary/fuelsales').replace(
       queryParameters: {'stationId': AppConfig.stationId, 'date': todayStart},
@@ -336,7 +362,11 @@ Future<List<PieChartSectionData>> _getFuelSaleData() async {
 // ၃။ Reward Point Summary (Supabase)
 Future<List<PieChartSectionData>> _getRewardPointData() async {
   final now = DateTime.now();
-  final todayStart = DateTime(now.year, now.month, now.day).toUtc().toIso8601String();
+  final todayStart = DateTime(
+    now.year,
+    now.month,
+    now.day,
+  ).toUtc().toIso8601String();
 
   final response = await Supabase.instance.client
       .from('fuel_transactions')

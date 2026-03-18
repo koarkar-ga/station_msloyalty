@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:station_msloyalty/Helper/RewardDetailDialog.dart';
+import 'package:station_msloyalty/Screens/RewardDetailScreen.dart';
 import 'package:station_msloyalty/Model/GiftCardModel.dart';
 import 'package:station_msloyalty/Constants/StyleConstants.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -17,22 +19,41 @@ Widget buildRewardGridView() {
 
       final cards = snapshot.data!.map((map) => GiftCard.fromMap(map)).toList();
 
+      final screenWidth = MediaQuery.of(context).size.width;
+      int crossAxisCount = 5;
+      if (screenWidth < 600) {
+        crossAxisCount = 2;
+      } else if (screenWidth < 900) {
+        crossAxisCount = 3;
+      } else if (screenWidth < 1200) {
+        crossAxisCount = 4;
+      }
+
       return GridView.builder(
         padding: const EdgeInsets.all(15),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 5, // တစ်တန်းကို ၅ ခုပြမယ် (Desktop/Tablet အတွက်)
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: crossAxisCount,
           crossAxisSpacing: 15,
           mainAxisSpacing: 15,
-          childAspectRatio: 0.8, // Card ရဲ့ အချိုးအစား
+          childAspectRatio: screenWidth < 600 ? 0.75 : 0.8,
         ),
         itemCount: cards.length,
         itemBuilder: (context, index) {
           return InkWell(
             onTap: () {
-              showDialog(
-                context: context,
-                builder: (context) => RewardDetailDialog(card: cards[index]),
-              );
+              if (screenWidth < 750) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => RewardDetailScreen(card: cards[index]),
+                  ),
+                );
+              } else {
+                showDialog(
+                  context: context,
+                  builder: (context) => RewardDetailDialog(card: cards[index]),
+                );
+              }
             },
             borderRadius: BorderRadius.circular(20),
             child: _buildGiftCardItem(cards[index], context),
@@ -145,7 +166,7 @@ Widget _buildGiftCardItem(GiftCard card, BuildContext context) {
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
-                      "EXPIRES: ${card.expireDate}",
+                      "EXPIRES: ${DateFormat('dd/MM/yyyy hh:mm a').format(DateTime.parse(card.expireDate!))}",
                       style: TextStyle(
                         color: isDark ? Colors.redAccent : Colors.red.shade700,
                         fontSize: 8,

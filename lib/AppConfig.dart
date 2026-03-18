@@ -1,8 +1,9 @@
-import 'dart:io';
-import 'package:ini/ini.dart';
-import 'package:path/path.dart' as p; // 'path' package ကို pubspec.yaml မှာ ထည့်ပေးပါ
+import 'package:isar/isar.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:station_msloyalty/Model/AppSettings.dart';
 
 class AppConfig {
+  static late Isar isar;
   static bool configExists = false;
   static String stationName = "MOONSUN"; // Default value
   static String stationId = "M001";
@@ -19,33 +20,33 @@ class AppConfig {
 
   static Future<void> loadConfig() async {
     try {
-      String exePath = Platform.resolvedExecutable;
-      String exeDir = p.dirname(exePath);
-      String configPath = p.join(exeDir, 'config.ini');
-      File configFile = File(configPath);
+      final dir = await getApplicationDocumentsDirectory();
+      isar = await Isar.open(
+        [AppSettingsSchema],
+        directory: dir.path,
+      );
 
-      if (await configFile.exists()) {
+      final settings = await isar.appSettings.where().findFirst();
+
+      if (settings != null) {
         configExists = true;
-        List<String> lines = await configFile.readAsLines();
-        Config config = Config.fromStrings(lines);
-
-        stationName = config.get("station", "name") ?? "Moon Sun";
-        stationId = config.get("station", "id") ?? "M001";
-
-        username = config.get("database", "username") ?? "sa";
-        password = config.get("database", "password") ?? "infosys2011iss@";
-        database = config.get("database", "database") ?? "M001";
-        host = config.get("database", "server") ?? "localhost";
-
-        apiUrl = config.get("api", "url") ?? "http://localhost:3000";
-        apiHealthUrl = "${AppConfig.apiUrl}/api/health";
-
-        exportPath = "$exeDir/reports";
-        print("Config Loaded from: $configPath");
+        stationName = settings.stationName ?? "MOONSUN";
+        stationId = settings.stationId ?? "M001";
+        host = settings.dbHost ?? "localhost";
+        username = settings.dbUser ?? "sa";
+        password = settings.dbPass ?? "infosys2011iss@";
+        database = settings.dbName ?? "M001";
+        apiUrl = settings.apiUrl ?? "http://localhost:3000";
+        apiHealthUrl = "$apiUrl/api/health";
+        
+        print("Config Loaded from Isar");
       } else {
         configExists = false;
-        print("config.ini not found at $configPath. Using defaults.");
+        print("No settings found in Isar. Using defaults.");
       }
+      
+      final docDir = await getApplicationDocumentsDirectory();
+      exportPath = "${docDir.path}/reports";
     } catch (e) {
       print("Error loading config: $e");
     }
@@ -61,29 +62,32 @@ class AppConfig {
     required String api,
   }) async {
     try {
-      String exePath = Platform.resolvedExecutable;
-      String exeDir = p.dirname(exePath);
-      String configPath = p.join(exeDir, 'config.ini');
+      final settings = await isar.appSettings.where().findFirst() ?? AppSettings();
       
-      final config = Config();
-      config.addSection("station");
-      config.set("station", "name", name);
-      config.set("station", "id", id);
-      
-      config.addSection("database");
-      config.set("database", "server", dbHost);
-      config.set("database", "username", dbUser);
-      config.set("database", "password", dbPass);
-      config.set("database", "database", dbName);
-      
-      config.addSection("api");
-      config.set("api", "url", api);
+      settings.stationName = name;
+      settings.stationId = id;
+      settings.dbHost = dbHost;
+      settings.dbUser = dbUser;
+      settings.dbPass = dbPass;
+      settings.dbName = dbName;
+      settings.apiUrl = api;
 
-      File configFile = File(configPath);
-      await configFile.writeAsString(config.toString());
+      await isar.writeTxn(() async {
+        await isar.appSettings.put(settings);
+      });
       
-      // Reload values after saving
-      await loadConfig();
+      // Update static values
+      stationName = name;
+      stationId = id;
+      host = dbHost;
+      username = dbUser;
+      password = dbPass;
+      database = dbName;
+      apiUrl = api;
+      apiHealthUrl = "$apiUrl/api/health";
+      configExists = true;
+
+      print("Config Saved to Isar");
     } catch (e) {
       print("Error saving config: $e");
       rethrow;

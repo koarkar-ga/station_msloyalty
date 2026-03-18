@@ -46,10 +46,12 @@ class _RewardQrScannerDialogState extends State<RewardQrScannerDialog>
       _initializeCamera();
     }
 
-    // Auto-focus for physical scanners
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _keyboardFocusNode.requestFocus();
-    });
+    // Auto-focus for physical scanners (only if camera is not used)
+    if (!widget.useCameraScanner) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _keyboardFocusNode.requestFocus();
+      });
+    }
   }
 
   Future<void> _initializeCamera() async {
@@ -277,31 +279,32 @@ class _RewardQrScannerDialogState extends State<RewardQrScannerDialog>
                 ),
               ),
 
-            // Hidden TextField for Physical QR Scanners
-            Opacity(
-              opacity: 0,
-              child: SizedBox(
-                width: 1,
-                height: 1,
-                child: TextField(
-                  controller: _keyboardController,
-                  focusNode: _keyboardFocusNode,
-                  autofocus: true,
-                  onSubmitted: (value) {
-                    if (value.isNotEmpty) {
-                      _isScannerActive = false;
-                      widget.onScan(value.trim());
-                    }
-                  },
-                  onChanged: (value) {
-                    if (value.contains('\n') || value.contains('\r')) {
-                      _isScannerActive = false;
-                      widget.onScan(value.trim());
-                    }
-                  },
+            // Hidden TextField for Physical QR Scanners (only if camera is not used)
+            if (!widget.useCameraScanner)
+              Opacity(
+                opacity: 0,
+                child: SizedBox(
+                  width: 1,
+                  height: 1,
+                  child: TextField(
+                    controller: _keyboardController,
+                    focusNode: _keyboardFocusNode,
+                    autofocus: true,
+                    onSubmitted: (value) {
+                      if (value.isNotEmpty) {
+                        _isScannerActive = false;
+                        widget.onScan(value.trim());
+                      }
+                    },
+                    onChanged: (value) {
+                      if (value.contains('\n') || value.contains('\r')) {
+                        _isScannerActive = false;
+                        widget.onScan(value.trim());
+                      }
+                    },
+                  ),
                 ),
               ),
-            ),
           ],
         ),
       ),

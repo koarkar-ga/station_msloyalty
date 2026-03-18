@@ -56,7 +56,13 @@ class UpdateService {
             children: [
               const Icon(Icons.system_update, color: Colors.blueAccent),
               const SizedBox(width: 12),
-              Text('Update Available (v$version)', style: const TextStyle(color: Colors.white)),
+              Expanded(
+                child: Text(
+                  'Update Available (v$version)', 
+                  style: const TextStyle(color: Colors.white, fontSize: 18),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
             ],
           ),
           content: Column(

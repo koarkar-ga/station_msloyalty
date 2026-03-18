@@ -93,7 +93,7 @@ class _SetupScreenState extends State<SetupScreen> {
                     ),
                     const SizedBox(height: 8),
                     const Text(
-                      "Please fill in the details to generate Config.ini",
+                      "Please fill in the details to initialize application settings",
                       style: TextStyle(color: Colors.grey),
                       textAlign: TextAlign.center,
                     ),

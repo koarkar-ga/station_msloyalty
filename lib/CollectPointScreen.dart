@@ -17,6 +17,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:station_msloyalty/Helper/CameraScannerDialog.dart';
 import 'package:station_msloyalty/Constants/StyleConstants.dart';
+import 'package:shimmer/shimmer.dart';
 
 class CollectPointScreen extends StatefulWidget {
   const CollectPointScreen({super.key});
@@ -29,6 +30,8 @@ class _CollectPointScreenState extends State<CollectPointScreen> {
   List<dynamic> localDataList = [];
   final StreamController<SalesLoadStatus> _localStreamController =
       StreamController<SalesLoadStatus>.broadcast();
+  final TextEditingController _searchController = TextEditingController();
+  final ValueNotifier<String> _searchQuery = ValueNotifier<String>('');
 
   @override
   void initState() {
@@ -60,6 +63,8 @@ class _CollectPointScreenState extends State<CollectPointScreen> {
   @override
   void dispose() {
     _localStreamController.close();
+    _searchController.dispose();
+    _searchQuery.dispose();
     super.dispose();
   }
 
@@ -79,34 +84,230 @@ class _CollectPointScreenState extends State<CollectPointScreen> {
                 : [StyleConstants.lightBg, const Color(0xFFE2E8F0)],
           ),
         ),
-        child: Row(
-          children: [
-            Expanded(
-              child: StreamBuilder<SalesLoadStatus>(
-                stream: _localStreamController.stream,
-                builder: (context, snapshot) {
-                  final status =
-                      snapshot.data ??
-                      SalesLoadStatus(data: [], progress: 0.0, isLoading: true);
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isNarrow = constraints.maxWidth < 1100;
+
+            final mainContent = StreamBuilder<SalesLoadStatus>(
+              stream: _localStreamController.stream,
+              builder: (context, snapshot) {
+                final status =
+                    snapshot.data ??
+                    SalesLoadStatus(data: [], progress: 0.0, isLoading: true);
+                final screenWidth = MediaQuery.of(context).size.width;
+                final isMobile = screenWidth < 750;
+
+                if (isMobile) {
                   return Stack(
                     children: [
                       Padding(
-                        padding: const EdgeInsets.all(24.0),
+                        padding: const EdgeInsets.all(16.0),
                         child: Column(
                           children: [
-                            _buildGlassHeader(context),
-                            const SizedBox(height: 16),
-                            Expanded(
-                              child: GlassContainer(
-                                child: ListView.builder(
-                                  itemCount: status.data.length,
-                                  itemBuilder: (context, index) =>
-                                      _buildDataRow(
-                                        status.data[index],
-                                        index,
-                                        context,
+                            // --- Search Box with Suggestions ---
+                            ValueListenableBuilder<String>(
+                              valueListenable: _searchQuery,
+                              builder: (context, query, _) {
+                                final suggestions = status.data
+                                    .map(
+                                      (s) => s['Vehical_No']?.toString() ?? '',
+                                    )
+                                    .where((v) => v.isNotEmpty)
+                                    .toSet()
+                                    .toList();
+
+                                return Autocomplete<String>(
+                                  optionsBuilder: (textEditingValue) {
+                                    if (textEditingValue.text.isEmpty)
+                                      return const Iterable<String>.empty();
+                                    return suggestions.where(
+                                      (s) => s.toLowerCase().contains(
+                                        textEditingValue.text.toLowerCase(),
                                       ),
-                                ),
+                                    );
+                                  },
+                                  onSelected: (selected) =>
+                                      _searchQuery.value = selected,
+                                  fieldViewBuilder:
+                                      (
+                                        context,
+                                        controller,
+                                        focusNode,
+                                        onFieldSubmitted,
+                                      ) {
+                                        if (controller.text !=
+                                                _searchQuery.value &&
+                                            _searchQuery.value.isEmpty) {
+                                          controller.text = "";
+                                        }
+                                        return TextField(
+                                          controller: controller,
+                                          focusNode: focusNode,
+                                          onChanged: (val) =>
+                                              _searchQuery.value = val,
+                                          style: TextStyle(
+                                            color: isDark
+                                                ? Colors.white
+                                                : Colors.black87,
+                                          ),
+                                          decoration: InputDecoration(
+                                            hintText: "Search by Vehicle No...",
+                                            hintStyle: TextStyle(
+                                              color: isDark
+                                                  ? Colors.white54
+                                                  : Colors.black54,
+                                            ),
+                                            prefixIcon: Icon(
+                                              Icons.search,
+                                              color: isDark
+                                                  ? Colors.white70
+                                                  : Colors.black54,
+                                            ),
+                                            suffixIcon:
+                                                _searchQuery.value.isNotEmpty
+                                                ? IconButton(
+                                                    icon: const Icon(
+                                                      Icons.clear,
+                                                      size: 20,
+                                                    ),
+                                                    onPressed: () {
+                                                      controller.clear();
+                                                      _searchQuery.value = "";
+                                                    },
+                                                  )
+                                                : null,
+                                            filled: true,
+                                            fillColor: isDark
+                                                ? Colors.white.withOpacity(0.05)
+                                                : Colors.black.withOpacity(
+                                                    0.05,
+                                                  ),
+                                            border: OutlineInputBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(15),
+                                              borderSide: BorderSide.none,
+                                            ),
+                                            contentPadding:
+                                                const EdgeInsets.symmetric(
+                                                  horizontal: 16,
+                                                  vertical: 12,
+                                                ),
+                                          ),
+                                        );
+                                      },
+                                  optionsViewBuilder:
+                                      (context, onSelected, options) {
+                                        return Align(
+                                          alignment: Alignment.topLeft,
+                                          child: Material(
+                                            elevation: 8,
+                                            borderRadius: BorderRadius.circular(
+                                              15,
+                                            ),
+                                            color: isDark
+                                                ? const Color(0xFF1E293B)
+                                                : Colors.white,
+                                            child: Container(
+                                              width: constraints.maxWidth - 32,
+                                              constraints: const BoxConstraints(
+                                                maxHeight: 250,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                borderRadius:
+                                                    BorderRadius.circular(15),
+                                                border: Border.all(
+                                                  color: isDark
+                                                      ? Colors.white10
+                                                      : Colors.black12,
+                                                ),
+                                              ),
+                                              child: ListView.builder(
+                                                padding: EdgeInsets.zero,
+                                                itemCount: options.length,
+                                                shrinkWrap: true,
+                                                itemBuilder: (context, index) {
+                                                  final option = options
+                                                      .elementAt(index);
+                                                  return ListTile(
+                                                    title: Text(
+                                                      option,
+                                                      style: TextStyle(
+                                                        color: isDark
+                                                            ? Colors.white
+                                                            : Colors.black87,
+                                                      ),
+                                                    ),
+                                                    onTap: () =>
+                                                        onSelected(option),
+                                                    dense: true,
+                                                  );
+                                                },
+                                              ),
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                );
+                              },
+                            ),
+                            const SizedBox(height: 16),
+                            // --- Filtered Card List ---
+                            Expanded(
+                              child: ValueListenableBuilder<String>(
+                                valueListenable: _searchQuery,
+                                builder: (context, query, _) {
+                                  final filteredData = status.data.where((
+                                    sale,
+                                  ) {
+                                    if (query.isEmpty) return true;
+                                    final vehicleNo =
+                                        sale['Vehical_No']
+                                            ?.toString()
+                                            .toLowerCase() ??
+                                        '';
+                                    return vehicleNo.contains(
+                                      query.toLowerCase(),
+                                    );
+                                  }).toList();
+
+                                  if (filteredData.isEmpty &&
+                                      !status.isLoading) {
+                                    return Center(
+                                      child: Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                            Icons.search_off_rounded,
+                                            size: 64,
+                                            color: isDark
+                                                ? Colors.white24
+                                                : Colors.black26,
+                                          ),
+                                          const SizedBox(height: 16),
+                                          Text(
+                                            "No results for \"$query\"",
+                                            style: TextStyle(
+                                              color: isDark
+                                                  ? Colors.white54
+                                                  : Colors.black54,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  }
+
+                                  return ListView.builder(
+                                    itemCount: filteredData.length,
+                                    itemBuilder: (context, index) =>
+                                        _buildMobileCard(
+                                          filteredData[index],
+                                          index,
+                                          context,
+                                        ),
+                                  );
+                                },
                               ),
                             ),
                           ],
@@ -118,8 +319,8 @@ class _CollectPointScreenState extends State<CollectPointScreen> {
                           status.data.length,
                         ),
                       Positioned(
-                        bottom: 40,
-                        right: 40,
+                        bottom: 20,
+                        right: 20,
                         child: FloatingActionButton(
                           backgroundColor: isDark
                               ? StyleConstants.darkAccent
@@ -133,15 +334,77 @@ class _CollectPointScreenState extends State<CollectPointScreen> {
                       ),
                     ],
                   );
-                },
-              ),
-            ),
+                }
 
-            // Right Panel
-            Padding(
-              padding: const EdgeInsets.fromLTRB(0, 24, 24, 24),
+                return Scrollbar(
+                  thumbVisibility: true,
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: SizedBox(
+                      width: 1000,
+                      child: Stack(
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.all(24.0),
+                            child: Column(
+                              children: [
+                                _buildGlassHeader(context),
+                                const SizedBox(height: 16),
+                                Expanded(
+                                  child: GlassContainer(
+                                    child: ListView.builder(
+                                      itemCount: status.data.length,
+                                      itemBuilder: (context, index) =>
+                                          _buildDataRow(
+                                            status.data[index],
+                                            index,
+                                            context,
+                                          ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (status.isLoading)
+                            buildProgressOverlay(
+                              status.progress,
+                              status.data.length,
+                            ),
+                          Positioned(
+                            bottom: 40,
+                            right: 40,
+                            child: FloatingActionButton(
+                              backgroundColor: isDark
+                                  ? StyleConstants.darkAccent
+                                  : StyleConstants.lightAccent,
+                              foregroundColor: isDark
+                                  ? Colors.black
+                                  : Colors.white,
+                              shape: const CircleBorder(),
+                              elevation: 4,
+                              onPressed: () => fetchPointSales(),
+                              child: const Icon(Icons.refresh_rounded),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            );
+
+            final rightPanel = Padding(
+              padding: EdgeInsets.fromLTRB(
+                isNarrow ? 24 : 0,
+                isNarrow ? 0 : 24,
+                24,
+                24,
+              ),
               child: SizedBox(
-                width: 380,
+                width: isNarrow ? double.infinity : 380,
+                height: isNarrow ? 500 : double.infinity,
                 child: GlassContainer(
                   padding: EdgeInsets.zero,
                   child: Column(
@@ -152,8 +415,26 @@ class _CollectPointScreenState extends State<CollectPointScreen> {
                   ),
                 ),
               ),
-            ),
-          ],
+            );
+
+            if (isNarrow) {
+              return SingleChildScrollView(
+                child: Column(
+                  children: [
+                    SizedBox(height: 600, child: mainContent),
+                    rightPanel,
+                  ],
+                ),
+              );
+            }
+
+            return Row(
+              children: [
+                Expanded(child: mainContent),
+                rightPanel,
+              ],
+            );
+          },
         ),
       ),
     );
@@ -329,6 +610,201 @@ class _CollectPointScreenState extends State<CollectPointScreen> {
       ),
     );
   }
+
+  Widget _buildMobileCard(dynamic sale, int index, BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final fuelTypeName = sale['FuelTypeName'] ?? 'Unknown';
+    final saleTypeName = sale['Sale_Type_name'] ?? 'Unknown';
+    final date = DateFormat(
+      'dd-MM-yy HH:mm',
+    ).format(DateTime.parse(sale['S_Date']));
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: GlassContainer(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "VOUCHER: ${sale['VocNo']}",
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        date,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isDark ? Colors.white60 : Colors.black54,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        "VEHICLE: ${sale['Vehical_No'] ?? '-'}",
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: isDark ? Colors.white70 : Colors.black87,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: getSaleTypeColor(saleTypeName).withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: getSaleTypeColor(saleTypeName).withOpacity(0.5),
+                    ),
+                  ),
+                  child: Text(
+                    saleTypeName,
+                    style: TextStyle(
+                      color: getSaleTypeColor(saleTypeName),
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const Divider(height: 24, thickness: 0.5),
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        "FUEL TYPE",
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: Colors.blueGrey,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Container(
+                            width: 10,
+                            height: 10,
+                            color: getFuelColor(fuelTypeName),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              fuelTypeName,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        "LITER",
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: Colors.blueGrey,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        "${sale['SALELITER']}",
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      const Text(
+                        "AMOUNT",
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: Colors.blueGrey,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        "${formatter.format(sale['TotalPrice'])} MMK",
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 13,
+                          color: Colors.orange,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child:
+                  (saleTypeName == 'Cash Sale' ||
+                      saleTypeName == 'ePayment' ||
+                      saleTypeName == 'Credit Sale')
+                  ? CheckAlreadyCollected(sale: sale)
+                  : Container(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.block_flipped,
+                            size: 18,
+                            color: Colors.redAccent,
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            "Not Eligible",
+                            style: TextStyle(
+                              color: Colors.redAccent,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class CheckAlreadyCollected extends StatefulWidget {
@@ -361,16 +837,27 @@ class _CheckAlreadyCollectedState extends State<CheckAlreadyCollected> {
     return StreamBuilder<bool>(
       stream: checkIfExistsStream(fullVocNo),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting)
-          return const SizedBox(
-            width: 20,
-            height: 20,
-            child: CircularProgressIndicator(strokeWidth: 2),
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Shimmer.fromColors(
+            baseColor: Colors.grey[300]!,
+            highlightColor: Colors.grey[100]!,
+            child: Container(
+              width: 40,
+              height: 40,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+              ),
+            ),
           );
+        }
         if (snapshot.data == true)
           return const Icon(Icons.check_circle, color: Colors.green, size: 24);
 
-        if (_useCameraScanner) {
+        final screenWidth = MediaQuery.of(context).size.width;
+        final bool isMobile = screenWidth < 750;
+
+        if (_useCameraScanner || isMobile) {
           return CameraScannerDialog(
             supabase: supabase,
             vocNo: widget.sale['VocNo'],

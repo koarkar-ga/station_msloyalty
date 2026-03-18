@@ -33,6 +33,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isPageSmall = screenWidth < 600;
+    final isPageNarrow = screenWidth < 1000;
+    final pagePadding = isPageSmall ? 16.0 : 24.0;
 
     return Scaffold(
       appBar: const MsAppBar(title: 'Station Dashboard', showBackButton: true),
@@ -46,17 +50,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
               : [StyleConstants.lightBg, const Color(0xFFE2E8F0)],
           ),
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
+        child: SingleChildScrollView(
+          padding: EdgeInsets.all(pagePadding),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
+              Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   Text(
                     "${AppConfig.stationName}",
                     style: TextStyle(
-                      fontSize: 28, 
+                      fontSize: isPageSmall ? 22 : 28, 
                       fontWeight: FontWeight.w900,
                       color: isDark ? Colors.white : StyleConstants.lightText,
                       letterSpacing: 1.2,
@@ -66,7 +71,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   Text(
                     "OVERVIEW",
                     style: TextStyle(
-                      fontSize: 28, 
+                      fontSize: isPageSmall ? 20 : 28, 
                       fontWeight: FontWeight.w300,
                       color: isDark ? Colors.white70 : Colors.black45,
                     ),
@@ -89,7 +94,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   final totalRewards = pointsData.isNotEmpty ? (pointsData[0]['total_points'] ?? 0) : 0;
                   final pointsIssued = issuedPointsData.isNotEmpty ? (issuedPointsData[0]['total_points'] ?? 0) : 0;
 
-                  return Row(
+                  final availableWidth = screenWidth - (pagePadding * 2);
+                  final cardWidth = isPageSmall 
+                    ? availableWidth 
+                    : (screenWidth < 900 ? (availableWidth - 20) / 2 : 280.0);
+                  
+                  return Wrap(
+                    spacing: 20,
+                    runSpacing: 20,
                     children: [
                       _buildGlassStatCard(
                         "TOTAL REWARDS",
@@ -98,8 +110,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         Icons.card_giftcard,
                         Colors.orangeAccent,
                         context,
+                        cardWidth,
                       ),
-                      const SizedBox(width: 20),
                       _buildGlassStatCard(
                         "POINTS ISSUED",
                         "${formatter.format(pointsIssued)}",
@@ -107,8 +119,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         Icons.stars,
                         Colors.greenAccent,
                         context,
+                        cardWidth,
                       ),
-                      const SizedBox(width: 10),
                       _buildGlassStatCard(
                         "STATION NAME",
                         AppConfig.stationName,
@@ -116,6 +128,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         Icons.location_city,
                         Colors.blueAccent,
                         context,
+                        cardWidth,
                       ),
                     ],
                   );
@@ -125,48 +138,55 @@ class _DashboardScreenState extends State<DashboardScreen> {
               const SizedBox(height: 32),
 
               // ၂။ အောက်က Main Content (Charts နှင့် Recent List)
-              Expanded(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // ဘယ်ဘက်ခြမ်း - Summary/Charts နေရာ
-                    Expanded(
-                      flex: 2, 
-                      child: GlassContainer(
-                        padding: const EdgeInsets.all(2),
-                        child: const SummaryGridWidget(),
-                      )
-                    ),
-                    const SizedBox(width: 24),
-
-                    // ညာဘက်ခြမ်း - Recent Redemptions
-                    Expanded(
-                      flex: 1,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.only(left: 8.0, bottom: 12),
-                            child: Text(
-                              "RECENT REDEMPTIONS",
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                color: isDark ? Colors.white70 : Colors.black54,
-                                letterSpacing: 1.5,
-                              ),
-                            ),
+              Builder(
+                builder: (context) {
+                  final chartWidget = GlassContainer(
+                    padding: const EdgeInsets.all(2),
+                    child: const SummaryGridWidget(),
+                  );
+                  
+                  final recentListWidget = Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(left: 8.0, bottom: 12, top: 24),
+                        child: Text(
+                          "RECENT REDEMPTIONS",
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.white70 : Colors.black54,
+                            letterSpacing: 1.5,
                           ),
-                          Expanded(
-                            child: GlassContainer(
-                              child: const RedemptionHistoryList(),
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
-                    ),
-                  ],
-                ),
+                      SizedBox(
+                        height: 500, // Fixed height for scrolling list when in column or narrow row
+                        child: GlassContainer(
+                          child: const RedemptionHistoryList(),
+                        ),
+                      ),
+                    ],
+                  );
+
+                  if (isPageNarrow) {
+                    return Column(
+                      children: [
+                        chartWidget,
+                        recentListWidget,
+                      ],
+                    );
+                  }
+
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(flex: 2, child: chartWidget),
+                      const SizedBox(width: 24),
+                      Expanded(flex: 1, child: recentListWidget),
+                    ],
+                  );
+                },
               ),
             ],
           ),
@@ -183,10 +203,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     IconData icon,
     Color color,
     BuildContext context,
+    double width,
   ) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
-    return Expanded(
+    return SizedBox(
+      width: width, 
       child: GlassContainer(
         padding: const EdgeInsets.all(24),
         child: Column(
