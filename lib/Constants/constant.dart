@@ -30,7 +30,10 @@ Future<void> syncSaleTypes() async {
   try {
     print("Syncing Sale Types from ${AppConfig.apiUrl}/api/saletypes...");
     final response = await http
-        .get(Uri.parse("${AppConfig.apiUrl}/api/saletypes"))
+        .get(
+          Uri.parse("${AppConfig.apiUrl}/api/saletypes"),
+          headers: AppConfig.headers,
+        )
         .timeout(const Duration(seconds: 10));
 
     if (response.statusCode == 200) {
@@ -52,7 +55,10 @@ Future<void> syncFuelTypes() async {
   try {
     // သားကြီးရဲ့ API URL ကို ဒီမှာ ထည့်ပါ
     final response = await http
-        .get(Uri.parse("${AppConfig.apiUrl}/api/fueltypes"))
+        .get(
+          Uri.parse("${AppConfig.apiUrl}/api/fueltypes"),
+          headers: AppConfig.headers,
+        )
         .timeout(const Duration(seconds: 10));
 
     if (response.statusCode == 200) {

@@ -24,10 +24,18 @@ tasks.register<Delete>("clean") {
 }
 
 subprojects {
-    plugins.withType<com.android.build.gradle.api.AndroidBasePlugin> {
-        val android = project.extensions.getByName("android") as com.android.build.gradle.BaseExtension
-        if (android.namespace == null) {
-            android.namespace = project.group.toString().takeIf { it.isNotEmpty() } ?: "dev.isar.isar_flutter_libs"
+    if (project.name == "isar_flutter_libs") {
+        configurations.all {
+            resolutionStrategy {
+                force("androidx.core:core:1.6.0", "androidx.core:core-ktx:1.6.0")
+            }
+        }
+    }
+    plugins.withId("com.android.library") {
+        extensions.configure<com.android.build.gradle.LibraryExtension> {
+            if (namespace == null) {
+                namespace = project.group.toString().takeIf { it.isNotEmpty() } ?: "dev.isar.isar_flutter_libs"
+            }
         }
     }
 }

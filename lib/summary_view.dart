@@ -4,18 +4,21 @@ import 'package:station_msloyalty/Constants/StyleConstants.dart';
 class SummaryView extends StatefulWidget {
   final Widget saleSummaryTable;
   final Widget fuelSummaryTable;
+  final Widget? stationSummaryTable;
   const SummaryView({
     super.key,
     required this.saleSummaryTable,
     required this.fuelSummaryTable,
+    this.stationSummaryTable,
   });
   @override
   _SummaryViewState createState() => _SummaryViewState();
 }
 
 class _SummaryViewState extends State<SummaryView> {
-  bool isTypeExpanded = true;
-  bool isFuelExpanded = true;
+  bool isTypeExpanded = false;
+  bool isFuelExpanded = false;
+  bool isStationExpanded = false;
 
   @override
   Widget build(BuildContext context) {
@@ -51,6 +54,22 @@ class _SummaryViewState extends State<SummaryView> {
             context: context,
             isMobile: isMobile,
           ),
+
+          if (widget.stationSummaryTable != null) ...[
+            if (!isMobile) const SizedBox(width: 20) else const SizedBox(height: 20),
+            
+            // Table 3: Station Summary
+            _buildPanel(
+              accentColor: Colors.greenAccent,
+              icon: Icons.location_city_rounded,
+              title: "Station Summary",
+              isExpanded: isStationExpanded,
+              onToggle: () => setState(() => isStationExpanded = !isStationExpanded),
+              child: widget.stationSummaryTable!,
+              context: context,
+              isMobile: isMobile,
+            ),
+          ],
         ];
 
         return Padding(
@@ -114,6 +133,7 @@ class _SummaryViewState extends State<SummaryView> {
             ConstrainedBox(
               constraints: const BoxConstraints(maxHeight: 250),
               child: SingleChildScrollView(
+                primary: false,
                 child: GlassContainer(
                   padding: EdgeInsets.zero,
                   child: child,

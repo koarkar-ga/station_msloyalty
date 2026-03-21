@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:station_msloyalty/AppConfig.dart';
 import 'package:syncfusion_flutter_xlsio/xlsio.dart' as xlsio;
-import 'package:path_provider/path_provider.dart';
 import 'package:open_file/open_file.dart';
 
 // Helper Class to store summary data
@@ -62,6 +61,8 @@ Future<void> exportSaleDataReport(
   sheet.getRangeByName('A3').cellStyle.hAlign = xlsio.HAlignType.center;
 
   List<String> columns = [
+    'Station ID',
+    'Station Name',
     'Grade',
     'Sale Type',
     'Sale Liter',
@@ -78,32 +79,34 @@ Future<void> exportSaleDataReport(
   }
 
   // --- 3. Data Grouping Logic ---
-  // Structure: Map<Grade, Map<SaleType, DataSummary>>
-  Map<String, Map<String, SaleDataSummary>> groupedData = {};
+  // Structure: Map<StationKey, Map<Grade, Map<SaleType, DataSummary>>>
+  // StationKey will be a combination to keep its info
+  Map<String, Map<String, Map<String, SaleDataSummary>>> groupedData = {};
+  Map<String, Map<String, String>> stationInfo = {}; // Map<StationKey, Map<attr, value>>
 
   for (var row in rawData) {
+    String sId = row['station_id'] ?? '-';
+    String sName = row['station_name'] ?? '-';
+    String sKey = "${sId}_$sName";
     String grade = row['FuelTypeName'] ?? 'Unknown';
-    String saleType =
-        row['Sale_Type_name'] ?? 'Cash Sale'; // e.g. CreditSale, ePayment
-    double liter =
-        double.tryParse(row['SALELITER']?.toStringAsFixed(4) ?? '0') ?? 0;
-    double amount =
-        double.tryParse(row['TotalPrice']?.toStringAsFixed(2) ?? '0') ?? 0;
-    double price =
-        double.tryParse(row['TodayPrice']?.toStringAsFixed(2) ?? '0') ?? 0;
+    String saleType = row['Sale_Type_name'] ?? 'Cash Sale';
+    double liter = double.tryParse(row['SALELITER']?.toStringAsFixed(4) ?? '0') ?? 0;
+    double amount = double.tryParse(row['TotalPrice']?.toStringAsFixed(2) ?? '0') ?? 0;
+    double price = double.tryParse(row['TodayPrice']?.toStringAsFixed(2) ?? '0') ?? 0;
 
-    // Grade မရှိသေးရင် အသစ်ဆောက်
-    if (!groupedData.containsKey(grade)) {
-      groupedData[grade] = {};
+    if (!stationInfo.containsKey(sKey)) {
+      stationInfo[sKey] = {'id': sId, 'name': sName};
     }
-
-    // SaleType မရှိသေးရင် အသစ်ဆောက်
-    if (!groupedData[grade]!.containsKey(saleType)) {
-      groupedData[grade]![saleType] = SaleDataSummary();
+    if (!groupedData.containsKey(sKey)) {
+      groupedData[sKey] = {};
     }
-
-    // Data ပေါင်းထည့်
-    groupedData[grade]![saleType]!.add(liter, amount, price);
+    if (!groupedData[sKey]!.containsKey(grade)) {
+      groupedData[sKey]![grade] = {};
+    }
+    if (!groupedData[sKey]![grade]!.containsKey(saleType)) {
+      groupedData[sKey]![grade]![saleType] = SaleDataSummary();
+    }
+    groupedData[sKey]![grade]![saleType]!.add(liter, amount, price);
   }
 
   // --- 4. Excel Writing Loop ---
@@ -112,107 +115,82 @@ Future<void> exportSaleDataReport(
   double grandTotalGallon = 0;
   double grandTotalAmount = 0;
 
-  // Grade တစ်ခုချင်းစီ Loop ပတ်မည်
-  for (var grade in groupedData.keys) {
-    Map<String, SaleDataSummary> saleTypesMap = groupedData[grade]!;
+  // Station တစ်ခုချင်းစီ Loop ပတ်မည်
+  for (var sKey in groupedData.keys) {
+    var sId = stationInfo[sKey]!['id'];
+    var sName = stationInfo[sKey]!['name'];
+    Map<String, Map<String, SaleDataSummary>> gradesMap = groupedData[sKey]!;
 
-    double gradeTotalLiter = 0;
-    double gradeTotalAmount = 0;
-    double gradeTotalGallon = 0;
+    for (var grade in gradesMap.keys) {
+      Map<String, SaleDataSummary> saleTypesMap = gradesMap[grade]!;
 
-    // Sale Type တစ်ခုချင်းစီ Loop ပတ်မည် (Cash, Credit, ePayment...)
-    for (var saleType in saleTypesMap.keys) {
-      var data = saleTypesMap[saleType]!;
-      double saleGallon = data.totalLiter / 4.546;
+      double gradeTotalLiter = 0;
+      double gradeTotalAmount = 0;
+      double gradeTotalGallon = 0;
 
-      // Sale Type အလိုက် ပေါင်းလဒ်ကို Map ထဲမှာ စုထားမည်
-      saleTypeSummary[saleType] =
-          (saleTypeSummary[saleType] ?? 0) + data.totalAmount;
+      for (var saleType in saleTypesMap.keys) {
+        var data = saleTypesMap[saleType]!;
+        double saleGallon = data.totalLiter / 4.546;
 
-      // Print Data Row
-      sheet.getRangeByIndex(currentRow, 1).setText(grade);
-      sheet
-          .getRangeByIndex(currentRow, 2)
-          .setText(saleType); // Cash Sale / Credit Sale / etc.
-      sheet
-          .getRangeByIndex(currentRow, 3)
-          .setNumber(double.parse(data.totalLiter.toStringAsFixed(3)));
-      sheet.getRangeByIndex(currentRow, 4).setNumber(data.price);
-      sheet.getRangeByIndex(currentRow, 4).cellStyle.hAlign =
-          xlsio.HAlignType.right;
-      sheet.getRangeByIndex(currentRow, 4).numberFormat = '#,##0.00';
+        saleTypeSummary[saleType] = (saleTypeSummary[saleType] ?? 0) + data.totalAmount;
 
-      sheet
-          .getRangeByIndex(currentRow, 5)
-          .setNumber(double.tryParse(saleGallon.toStringAsFixed(4)) ?? 0);
-      sheet.getRangeByIndex(currentRow, 5).cellStyle.hAlign =
-          xlsio.HAlignType.right;
-      sheet.getRangeByIndex(currentRow, 5).numberFormat = '#,##0.0000';
+        sheet.getRangeByIndex(currentRow, 1).setText(sId);
+        sheet.getRangeByIndex(currentRow, 2).setText(sName);
+        sheet.getRangeByIndex(currentRow, 3).setText(grade);
+        sheet.getRangeByIndex(currentRow, 4).setText(saleType);
+        sheet.getRangeByIndex(currentRow, 5).setNumber(double.parse(data.totalLiter.toStringAsFixed(3)));
+        sheet.getRangeByIndex(currentRow, 6).setNumber(data.price);
+        sheet.getRangeByIndex(currentRow, 6).cellStyle.hAlign = xlsio.HAlignType.right;
+        sheet.getRangeByIndex(currentRow, 6).numberFormat = '#,##0.00';
 
-      sheet
-          .getRangeByIndex(currentRow, 6)
-          .setNumber(double.tryParse(data.totalAmount.toStringAsFixed(3)) ?? 0);
-      sheet.getRangeByIndex(currentRow, 6).cellStyle.hAlign =
-          xlsio.HAlignType.right;
-      sheet.getRangeByIndex(currentRow, 6).numberFormat = '#,##0.00';
+        sheet.getRangeByIndex(currentRow, 7).setNumber(double.tryParse(saleGallon.toStringAsFixed(4)) ?? 0);
+        sheet.getRangeByIndex(currentRow, 7).cellStyle.hAlign = xlsio.HAlignType.right;
+        sheet.getRangeByIndex(currentRow, 7).numberFormat = '#,##0.0000';
 
-      sheet.getRangeByIndex(currentRow, 7).setNumber(0);
-      sheet.getRangeByIndex(currentRow, 7).cellStyle.hAlign =
-          xlsio.HAlignType.right;
-      sheet.getRangeByIndex(currentRow, 7).numberFormat = '#,##0.00';
+        sheet.getRangeByIndex(currentRow, 8).setNumber(double.tryParse(data.totalAmount.toStringAsFixed(3)) ?? 0);
+        sheet.getRangeByIndex(currentRow, 8).cellStyle.hAlign = xlsio.HAlignType.right;
+        sheet.getRangeByIndex(currentRow, 8).numberFormat = '#,##0.00';
 
-      sheet.getRangeByIndex(currentRow, 8).setNumber(0);
-      sheet.getRangeByIndex(currentRow, 8).cellStyle.hAlign =
-          xlsio.HAlignType.right;
-      sheet.getRangeByIndex(currentRow, 8).numberFormat = '#,##0.00';
+        sheet.getRangeByIndex(currentRow, 9).setNumber(0);
+        sheet.getRangeByIndex(currentRow, 9).cellStyle.hAlign = xlsio.HAlignType.right;
+        sheet.getRangeByIndex(currentRow, 9).numberFormat = '#,##0.00';
 
-      sheet
-          .getRangeByIndex(currentRow, 9)
-          .setNumber(double.tryParse(data.totalAmount.toStringAsFixed(3)) ?? 0);
-      sheet.getRangeByIndex(currentRow, 9).cellStyle.hAlign =
-          xlsio.HAlignType.right;
-      sheet.getRangeByIndex(currentRow, 9).numberFormat = '#,##0.00';
+        sheet.getRangeByIndex(currentRow, 10).setNumber(0);
+        sheet.getRangeByIndex(currentRow, 10).cellStyle.hAlign = xlsio.HAlignType.right;
+        sheet.getRangeByIndex(currentRow, 10).numberFormat = '#,##0.00';
 
-      // Apply Style
-      for (int i = 1; i <= 9; i++) {
-        sheet.getRangeByIndex(currentRow, i).cellStyle = cellStyle;
+        sheet.getRangeByIndex(currentRow, 11).setNumber(double.tryParse(data.totalAmount.toStringAsFixed(3)) ?? 0);
+        sheet.getRangeByIndex(currentRow, 11).cellStyle.hAlign = xlsio.HAlignType.right;
+        sheet.getRangeByIndex(currentRow, 11).numberFormat = '#,##0.00';
+
+        for (int i = 1; i <= 11; i++) {
+          sheet.getRangeByIndex(currentRow, i).cellStyle = cellStyle;
+        }
+
+        currentRow++;
+        gradeTotalLiter += data.totalLiter;
+        gradeTotalAmount += data.totalAmount;
+        gradeTotalGallon += saleGallon;
       }
 
+      // === Grade Total Row ===
+      sheet.getRangeByIndex(currentRow, 4).setText('TOTAL');
+      sheet.getRangeByIndex(currentRow, 5).setNumber(double.parse(gradeTotalLiter.toStringAsFixed(3)));
+      sheet.getRangeByIndex(currentRow, 7).setNumber(double.parse(gradeTotalGallon.toStringAsFixed(4)));
+      sheet.getRangeByIndex(currentRow, 8).setNumber(gradeTotalAmount);
+      sheet.getRangeByIndex(currentRow, 8).numberFormat = '#,##0.00';
+      sheet.getRangeByIndex(currentRow, 11).setNumber(gradeTotalAmount);
+      sheet.getRangeByIndex(currentRow, 11).numberFormat = '#,##0.00';
+
+      for (int i = 1; i <= 11; i++) {
+        sheet.getRangeByIndex(currentRow, i).cellStyle = totalStyle;
+      }
       currentRow++;
 
-      // Subtotals ပေါင်းခြင်း
-      gradeTotalLiter += data.totalLiter;
-      gradeTotalAmount += data.totalAmount;
-      gradeTotalGallon += saleGallon;
+      grandTotalLiter += gradeTotalLiter;
+      grandTotalAmount += gradeTotalAmount;
+      grandTotalGallon += gradeTotalGallon;
     }
-
-    // === Grade Total Row (Red) ===
-    sheet.getRangeByIndex(currentRow, 2).setText('TOTAL');
-    sheet
-        .getRangeByIndex(currentRow, 3)
-        .setNumber(double.parse(gradeTotalLiter.toStringAsFixed(3)));
-    sheet
-        .getRangeByIndex(currentRow, 5)
-        .setNumber(double.parse(gradeTotalGallon.toStringAsFixed(4)));
-    sheet.getRangeByIndex(currentRow, 6).setNumber(gradeTotalAmount);
-    sheet.getRangeByIndex(currentRow, 6).numberFormat = '#,##0.00';
-    sheet.getRangeByIndex(currentRow, 6).cellStyle.hAlign =
-        xlsio.HAlignType.right;
-
-    sheet.getRangeByIndex(currentRow, 9).setNumber(gradeTotalAmount);
-    sheet.getRangeByIndex(currentRow, 9).numberFormat = '#,##0.00';
-    sheet.getRangeByIndex(currentRow, 9).cellStyle.hAlign =
-        xlsio.HAlignType.right;
-
-    for (int i = 1; i <= 9; i++) {
-      sheet.getRangeByIndex(currentRow, i).cellStyle = totalStyle;
-    }
-    currentRow++;
-
-    // Grand Totals ပေါင်းခြင်း
-    grandTotalLiter += gradeTotalLiter;
-    grandTotalAmount += gradeTotalAmount;
-    grandTotalGallon += gradeTotalGallon;
   }
 
   // ၁။ Grand Total ပြီးနောက် ၂ ကြောင်းမြောက်မှာ စရေးမယ်
@@ -259,26 +237,24 @@ Future<void> exportSaleDataReport(
 
   // --- 5. GRAND TOTAL ---
   sheet.getRangeByIndex(currentRow, 1).setText('GRAND TOTAL');
-  sheet.getRangeByIndex(currentRow, 1, currentRow, 2).merge();
+  sheet.getRangeByIndex(currentRow, 1, currentRow, 4).merge();
 
-  var totalCell = sheet.getRangeByIndex(currentRow, 3);
+  var totalCell = sheet.getRangeByIndex(currentRow, 5);
   totalCell.setNumber(double.parse(grandTotalLiter.toStringAsFixed(3)));
-  sheet.getRangeByIndex(currentRow, 3).numberFormat = '#,##0.000';
-  xlsio.Style totalCellStyle = workbook.styles.add('totalStyle$currentRow');
-  totalCellStyle.numberFormat = '#,##0.000';
-
+  sheet.getRangeByIndex(currentRow, 5).numberFormat = '#,##0.000';
+  
   sheet
-      .getRangeByIndex(currentRow, 5)
+      .getRangeByIndex(currentRow, 7)
       .setNumber(double.parse(grandTotalGallon.toStringAsFixed(4)));
-  sheet.getRangeByIndex(currentRow, 5).numberFormat = '#,##0.0000';
+  sheet.getRangeByIndex(currentRow, 7).numberFormat = '#,##0.0000';
 
-  sheet.getRangeByIndex(currentRow, 6).setNumber(grandTotalAmount);
-  sheet.getRangeByIndex(currentRow, 6).numberFormat = '#,##0.00';
+  sheet.getRangeByIndex(currentRow, 8).setNumber(grandTotalAmount);
+  sheet.getRangeByIndex(currentRow, 8).numberFormat = '#,##0.00';
 
-  sheet.getRangeByIndex(currentRow, 9).setNumber(grandTotalAmount);
-  sheet.getRangeByIndex(currentRow, 9).numberFormat = '#,##0.00';
+  sheet.getRangeByIndex(currentRow, 11).setNumber(grandTotalAmount);
+  sheet.getRangeByIndex(currentRow, 11).numberFormat = '#,##0.00';
 
-  for (int i = 1; i <= 9; i++) {
+  for (int i = 1; i <= 11; i++) {
     sheet.getRangeByIndex(currentRow, i).cellStyle = totalStyle;
   }
 
@@ -299,11 +275,15 @@ Future<void> exportSaleDataReport(
   final List<int> bytes = workbook.saveAsStream();
   workbook.dispose();
 
-  final directory = await getApplicationSupportDirectory();
   final path =
       "${AppConfig.exportPath}/SaleReport_${DateTime.now().millisecondsSinceEpoch}.xlsx";
-  //final path = "${AppConfig.exportPath}/SaleReport_${DateTime.now().millisecondsSinceEpoch}.xlsx";
   final file = File(path);
+
+  // Folder မရှိရင် ဆောက်မယ်
+  if (!await file.parent.exists()) {
+    await file.parent.create(recursive: true);
+  }
+
   print(path);
   await file.writeAsBytes(bytes, flush: true);
   OpenFile.open(path);

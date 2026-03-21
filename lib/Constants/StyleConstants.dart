@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 
 class StyleConstants {
@@ -9,7 +8,7 @@ class StyleConstants {
   static const double borderRadius = 16.0;
 
   // ── Color Schemes ──────────────────────────────────────────────────
-  
+
   // Dark Theme (Modern Blue/Gold)
   static const Color darkBg = Color(0xFF0F172A);
   static const Color darkSurface = Color(0xFF1E293B);
@@ -25,7 +24,7 @@ class StyleConstants {
   static const Color lightGlass = Color(0x1A000000);
 
   // ── Theme Data ─────────────────────────────────────────────────────
-  
+
   static ThemeData getLightTheme() {
     return ThemeData(
       useMaterial3: true,
@@ -90,7 +89,7 @@ class GlassContainer extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final r = borderRadius ?? StyleConstants.borderRadius;
-    
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(r),
       child: Container(
@@ -98,10 +97,18 @@ class GlassContainer extends StatelessWidget {
         height: height,
         padding: padding,
         decoration: BoxDecoration(
-          color: (isDark ? StyleConstants.darkSurface : StyleConstants.lightSurface).withOpacity(opacity * 2), // Increase opacity for better contrast without blur
+          color:
+              (isDark
+                      ? StyleConstants.darkSurface
+                      : StyleConstants.lightSurface)
+                  .withOpacity(
+                    opacity * 2,
+                  ), // Increase opacity for better contrast without blur
           borderRadius: BorderRadius.circular(r),
           border: Border.all(
-            color: (isDark ? Colors.white : Colors.black).withOpacity(StyleConstants.glassBorderOpacity),
+            color: (isDark ? Colors.white : Colors.black).withOpacity(
+              StyleConstants.glassBorderOpacity,
+            ),
             width: 1,
           ),
         ),

@@ -37,9 +37,9 @@ class _SaleEntryScreenState extends State<SaleEntryScreen> {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: isDark 
-              ? [StyleConstants.darkBg, const Color(0xFF1E293B)]
-              : [StyleConstants.lightBg, const Color(0xFFE2E8F0)],
+            colors: isDark
+                ? [StyleConstants.darkBg, const Color(0xFF1E293B)]
+                : [StyleConstants.lightBg, const Color(0xFFE2E8F0)],
           ),
         ),
         child: Stack(
@@ -58,41 +58,63 @@ class _SaleEntryScreenState extends State<SaleEntryScreen> {
                         children: [
                           Row(
                             children: [
-                              Icon(Icons.edit_document, color: isDark ? StyleConstants.darkAccent : StyleConstants.lightAccent),
+                              Icon(
+                                Icons.edit_document,
+                                color: isDark
+                                    ? StyleConstants.darkAccent
+                                    : StyleConstants.lightAccent,
+                              ),
                               const SizedBox(width: 12),
                               Text(
                                 "SALE RECORD ENTRY",
                                 style: TextStyle(
                                   fontSize: 20,
                                   fontWeight: FontWeight.bold,
-                                  color: isDark ? Colors.white : StyleConstants.lightText,
+                                  color: isDark
+                                      ? Colors.white
+                                      : StyleConstants.lightText,
                                   letterSpacing: 1.2,
                                 ),
                               ),
                             ],
                           ),
                           const SizedBox(height: 12),
-                          Divider(color: (isDark ? Colors.white : Colors.black).withOpacity(0.1)),
+                          Divider(
+                            color: (isDark ? Colors.white : Colors.black)
+                                .withOpacity(0.1),
+                          ),
                           const SizedBox(height: 24),
 
                           // Grade ရွေးရန်
                           _buildFieldLabel("Fuel Grade", isDark),
                           DropdownButtonFormField<String>(
-                            value: selectedGrade,
-                            dropdownColor: isDark ? StyleConstants.darkSurface : Colors.white,
-                            style: TextStyle(color: isDark ? Colors.white : Colors.black),
+                            initialValue: selectedGrade,
+                            dropdownColor: isDark
+                                ? StyleConstants.darkSurface
+                                : Colors.white,
+                            style: TextStyle(
+                              color: isDark ? Colors.white : Colors.black,
+                            ),
                             decoration: InputDecoration(
                               filled: true,
-                              fillColor: (isDark ? Colors.white : Colors.black).withOpacity(0.05),
+                              fillColor: (isDark ? Colors.white : Colors.black)
+                                  .withOpacity(0.05),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide: BorderSide.none,
                               ),
                             ),
-                            items: ['92 Ron', '95 Ron', 'Premium Diesel', 'Diesel']
-                                .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                                .toList(),
-                            onChanged: (val) => setState(() => selectedGrade = val),
+                            items:
+                                ['92 Ron', '95 Ron', 'Premium Diesel', 'Diesel']
+                                    .map(
+                                      (e) => DropdownMenuItem(
+                                        value: e,
+                                        child: Text(e),
+                                      ),
+                                    )
+                                    .toList(),
+                            onChanged: (val) =>
+                                setState(() => selectedGrade = val),
                           ),
 
                           const SizedBox(height: 24),
@@ -101,12 +123,15 @@ class _SaleEntryScreenState extends State<SaleEntryScreen> {
                           _buildFieldLabel("Liter Amount", isDark),
                           TextField(
                             controller: _literController,
-                            style: TextStyle(color: isDark ? Colors.white : Colors.black),
+                            style: TextStyle(
+                              color: isDark ? Colors.white : Colors.black,
+                            ),
                             decoration: InputDecoration(
                               prefixIcon: const Icon(Icons.water_drop_outlined),
                               hintText: "0.000",
                               filled: true,
-                              fillColor: (isDark ? Colors.white : Colors.black).withOpacity(0.05),
+                              fillColor: (isDark ? Colors.white : Colors.black)
+                                  .withOpacity(0.05),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide: BorderSide.none,
@@ -122,12 +147,16 @@ class _SaleEntryScreenState extends State<SaleEntryScreen> {
                           _buildFieldLabel("Total Amount (MMK)", isDark),
                           TextField(
                             controller: _amountController,
-                            style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold),
+                            style: TextStyle(
+                              color: isDark ? Colors.white : Colors.black,
+                              fontWeight: FontWeight.bold,
+                            ),
                             decoration: InputDecoration(
                               prefixIcon: const Icon(Icons.payments_outlined),
                               hintText: "0",
                               filled: true,
-                              fillColor: (isDark ? Colors.white : Colors.black).withOpacity(0.05),
+                              fillColor: (isDark ? Colors.white : Colors.black)
+                                  .withOpacity(0.05),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide: BorderSide.none,
@@ -146,9 +175,15 @@ class _SaleEntryScreenState extends State<SaleEntryScreen> {
                             child: ElevatedButton(
                               onPressed: () {},
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: isDark ? StyleConstants.darkAccent : StyleConstants.lightAccent,
-                                foregroundColor: isDark ? Colors.black : Colors.white,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                backgroundColor: isDark
+                                    ? StyleConstants.darkAccent
+                                    : StyleConstants.lightAccent,
+                                foregroundColor: isDark
+                                    ? Colors.black
+                                    : Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
                                 elevation: 0,
                               ),
                               child: const Row(
@@ -158,7 +193,11 @@ class _SaleEntryScreenState extends State<SaleEntryScreen> {
                                   SizedBox(width: 12),
                                   Text(
                                     "SAVE SALE RECORD",
-                                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1.1),
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 1.1,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -195,7 +234,8 @@ class _SaleEntryScreenState extends State<SaleEntryScreen> {
                             child: ListView.separated(
                               padding: const EdgeInsets.all(16),
                               itemCount: 8,
-                              separatorBuilder: (context, index) => const SizedBox(height: 12),
+                              separatorBuilder: (context, index) =>
+                                  const SizedBox(height: 12),
                               itemBuilder: (context, index) {
                                 return GlassContainer(
                                   opacity: 0.05,
@@ -209,25 +249,34 @@ class _SaleEntryScreenState extends State<SaleEntryScreen> {
                                           color: Colors.blue.withOpacity(0.1),
                                           shape: BoxShape.circle,
                                         ),
-                                        child: const Icon(Icons.local_gas_station, color: Colors.blue, size: 20),
+                                        child: const Icon(
+                                          Icons.local_gas_station,
+                                          color: Colors.blue,
+                                          size: 20,
+                                        ),
                                       ),
                                       const SizedBox(width: 16),
                                       Expanded(
                                         child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                           children: [
                                             Text(
                                               "92 Ron - 15.500 L",
                                               style: TextStyle(
                                                 fontWeight: FontWeight.bold,
-                                                color: isDark ? Colors.white : Colors.black87,
+                                                color: isDark
+                                                    ? Colors.white
+                                                    : Colors.black87,
                                               ),
                                             ),
                                             Text(
                                               "May 20, 2024 • 11:20 AM",
                                               style: TextStyle(
                                                 fontSize: 12,
-                                                color: isDark ? Colors.white38 : Colors.black38,
+                                                color: isDark
+                                                    ? Colors.white38
+                                                    : Colors.black38,
                                               ),
                                             ),
                                           ],
@@ -237,7 +286,9 @@ class _SaleEntryScreenState extends State<SaleEntryScreen> {
                                         "38,750 MMK",
                                         style: TextStyle(
                                           fontWeight: FontWeight.w900,
-                                          color: isDark ? StyleConstants.darkAccent : StyleConstants.lightAccent,
+                                          color: isDark
+                                              ? StyleConstants.darkAccent
+                                              : StyleConstants.lightAccent,
                                         ),
                                       ),
                                     ],

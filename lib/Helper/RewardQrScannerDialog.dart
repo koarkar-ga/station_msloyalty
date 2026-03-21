@@ -26,7 +26,7 @@ class RewardQrScannerDialog extends StatefulWidget {
 class _RewardQrScannerDialogState extends State<RewardQrScannerDialog>
     with SingleTickerProviderStateMixin {
   CameraController? _cameraController;
-  bool _isProcessing = false;
+  final bool _isProcessing = false;
   bool _isScannerActive = true;
   AnimationController? _animationController;
   Timer? _processingTimer;

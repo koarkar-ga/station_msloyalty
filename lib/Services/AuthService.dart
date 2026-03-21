@@ -16,9 +16,10 @@ class AuthService {
 
       if (data != null) {
         return {
-          'id': data['uuid'],
+                    'id': data['uuid'],
           'userlevel': data['userlevel'],
           'station_code': data['station_code'],
+          'permissions': data['permissions'],
           'status': 'success',
           'message': 'Login Successful'
         };

@@ -11,6 +11,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:station_msloyalty/Helper/BuildQrView.dart';
 import 'package:bot_toast/bot_toast.dart';
 import 'package:station_msloyalty/config.dart' as Config;
+import 'package:station_msloyalty/AppConfig.dart';
+import 'package:station_msloyalty/Model/OfflineTransaction.dart';
+import 'package:isar/isar.dart';
 
 class CameraScannerDialog extends StatefulWidget {
   final SupabaseClient supabase;
@@ -211,11 +214,11 @@ class _ScannerDialogContentState extends State<_ScannerDialogContent>
     setState(() => _isProcessing = true);
     _isScannerActive = false;
 
+    String targetUid = '';
+    String? dynamicTokenId;
+
     try {
       BotToast.showLoading();
-
-      String targetUid = '';
-      String? dynamicTokenId;
       final String trimmedQr = qrData.trim();
       final String upperQr = trimmedQr.toUpperCase();
 
@@ -339,7 +342,19 @@ class _ScannerDialogContentState extends State<_ScannerDialogContent>
         throw res['message']?.toString() ?? 'Something went wrong';
       }
     } catch (e) {
-      BotToast.showText(text: "Error: $e", contentColor: Colors.red);
+      final errorStr = e.toString();
+      if (errorStr.contains('SocketException') ||
+          errorStr.contains('HttpException') ||
+          errorStr.contains('HandshakeException') ||
+          errorStr.contains('Network') ||
+          errorStr.contains('failed to connect')) {
+        
+        if (mounted) {
+           _handleOfflineSave(qrData, targetUid, dynamicTokenId, dialogContext);
+        }
+      } else {
+        BotToast.showText(text: "Error: $e", contentColor: Colors.red);
+      }
       if (mounted) {
         setState(() {
           _isProcessing = false;
@@ -348,6 +363,74 @@ class _ScannerDialogContentState extends State<_ScannerDialogContent>
       }
     } finally {
       BotToast.closeAllLoading();
+    }
+  }
+
+  Future<void> _handleOfflineSave(String qrData, String targetUid, String? dynamicTokenId, BuildContext dialogContext) async {
+    // Basic validation check before saving offline
+    if (targetUid.isEmpty && dynamicTokenId == null) {
+      BotToast.showText(text: "QR Data invalid for offline save", contentColor: Colors.red);
+      return;
+    }
+
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Connection Offline"),
+        content: const Text("Internet မရှိသော်လည်း ဤ Scan ကို အော့ဖ်လိုင်း သိမ်းဆည်းထားလိုပါသလား?\n(အွန်လိုင်းရောက်မှသာ Point ရရှိပါမည်)"),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Cancel")),
+          ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text("Save Offline")),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      final String stationId = Config.config['database'] as String;
+      final String fullVocNo = "$stationId${widget.vocNo}";
+
+      // Check local duplicate first
+      final existing = await AppConfig.isar.offlineTransactions
+          .where()
+          .vocNoEqualTo(fullVocNo)
+          .findFirst();
+
+      if (existing != null) {
+        BotToast.showText(text: "ဤ Voucher ကို အော့ဖ်လိုင်း သိမ်းဆည်းပြီးသား ဖြစ်နေပါသည်။", contentColor: Colors.orange);
+        Navigator.pop(dialogContext);
+        return;
+      }
+
+      final offlineTx = OfflineTransaction()
+        ..targetUid = targetUid
+        ..dynamicTokenId = dynamicTokenId
+        ..stationId = stationId
+        ..fuelType = widget.fuelType
+        ..amountMmk = double.tryParse(widget.amount)
+        ..vocNo = fullVocNo
+        ..saleType = widget.saleType
+        ..vehicleNo = widget.vehicalNo
+        ..paymentType = widget.saleType
+        ..unitPrice = widget.unitPrice
+        ..saleLiter = widget.saleLiter
+        ..createdAt = DateTime.now()
+        ..isSynced = false;
+
+      await AppConfig.isar.writeTxn(() async {
+        await AppConfig.isar.offlineTransactions.put(offlineTx);
+      });
+
+      if (mounted) {
+        Navigator.pop(dialogContext);
+        BotToast.showText(
+          text: "Offline သိမ်းဆည်းပြီးပါပြီ။ Sync ပြန်လုပ်ပေးရန် လိုအပ်ပါသည်။",
+          duration: const Duration(seconds: 3),
+        );
+      }
+    } catch (e) {
+      BotToast.showText(text: "Offline Save Error: $e", contentColor: Colors.red);
     }
   }
 

@@ -18,12 +18,18 @@ class _RedemptionHistoryListState extends State<RedemptionHistoryList> {
   void initState() {
     super.initState();
     // Initialize stream ONLY ONCE to prevent infinite build loops
-    _historyStream = Supabase.instance.client
+    final query = Supabase.instance.client
         .from('redemption_history')
-        .stream(primaryKey: ['id'])
-        .eq('station_id', AppConfig.stationId)
-        .order('created_at', ascending: false)
-        .limit(10);
+        .stream(primaryKey: ['id']);
+
+    if (AppConfig.stationId != 'ALL') {
+      _historyStream = query
+          .eq('station_id', AppConfig.stationId)
+          .order('created_at', ascending: false)
+          .limit(10);
+    } else {
+      _historyStream = query.order('created_at', ascending: false).limit(10);
+    }
   }
 
   @override
@@ -31,21 +37,35 @@ class _RedemptionHistoryListState extends State<RedemptionHistoryList> {
     return StreamBuilder<List<Map<String, dynamic>>>(
       stream: _historyStream,
       builder: (context, snapshot) {
-        if (snapshot.hasError) return Center(child: Text("Error: ${snapshot.error}", style: TextStyle(color: Colors.red)));
-        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+        if (snapshot.hasError)
+          return Center(
+            child: Text(
+              "Error: ${snapshot.error}",
+              style: TextStyle(color: Colors.red),
+            ),
+          );
+        if (!snapshot.hasData)
+          return const Center(child: CircularProgressIndicator());
 
         final now = DateTime.now();
         final today = DateTime(now.year, now.month, now.day);
 
         final history = (snapshot.data ?? []).where((item) {
           final createdAt = DateTime.parse(item['created_at']).toLocal();
-          final itemDate = DateTime(createdAt.year, createdAt.month, createdAt.day);
+          final itemDate = DateTime(
+            createdAt.year,
+            createdAt.month,
+            createdAt.day,
+          );
           return itemDate.isAtSameMomentAs(today);
         }).toList();
 
         if (history.isEmpty) {
           return const Center(
-            child: Text("No Redemption History", style: TextStyle(color: Colors.grey)),
+            child: Text(
+              "No Redemption History",
+              style: TextStyle(color: Colors.grey),
+            ),
           );
         }
 
@@ -85,7 +105,7 @@ class _RedemptionCardState extends State<RedemptionCard> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final data = widget.data;
-    
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
@@ -110,7 +130,11 @@ class _RedemptionCardState extends State<RedemptionCard> {
               color: const Color(0xFFFDF2E9),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.card_giftcard_rounded, color: Colors.orange, size: 20),
+            child: const Icon(
+              Icons.card_giftcard_rounded,
+              color: Colors.orange,
+              size: 20,
+            ),
           ),
           const SizedBox(width: 14),
           // ၂။ Info Section
@@ -149,11 +173,20 @@ class _RedemptionCardState extends State<RedemptionCard> {
                 // အချိန်ပြမယ်
                 Row(
                   children: [
-                    Icon(Icons.access_time_rounded, size: 10, color: Colors.blueGrey[200]),
+                    Icon(
+                      Icons.access_time_rounded,
+                      size: 10,
+                      color: Colors.blueGrey[200],
+                    ),
                     const SizedBox(width: 4),
                     Text(
-                      DateFormat('dd/MM/yyyy hh:mm aa').format(DateTime.parse(data['created_at']).toLocal()),
-                      style: TextStyle(fontSize: 9, color: Colors.blueGrey[300]),
+                      DateFormat(
+                        'dd/MM/yyyy hh:mm aa',
+                      ).format(DateTime.parse(data['created_at']).toLocal()),
+                      style: TextStyle(
+                        fontSize: 9,
+                        color: Colors.blueGrey[300],
+                      ),
                     ),
                   ],
                 ),

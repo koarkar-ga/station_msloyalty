@@ -16,8 +16,11 @@ import 'package:station_msloyalty/Services/CheckVocNoExists.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:station_msloyalty/Helper/CameraScannerDialog.dart';
-import 'package:station_msloyalty/Constants/StyleConstants.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:bot_toast/bot_toast.dart';
+import 'package:station_msloyalty/Constants/StyleConstants.dart';
+import 'package:station_msloyalty/Model/OfflineTransaction.dart';
+import 'package:isar/isar.dart';
 
 class CollectPointScreen extends StatefulWidget {
   const CollectPointScreen({super.key});
@@ -32,11 +35,177 @@ class _CollectPointScreenState extends State<CollectPointScreen> {
       StreamController<SalesLoadStatus>.broadcast();
   final TextEditingController _searchController = TextEditingController();
   final ValueNotifier<String> _searchQuery = ValueNotifier<String>('');
+  final ValueNotifier<int> _offlineCount = ValueNotifier<int>(0);
+  StreamSubscription? _offlineSubscription;
+  bool _isSyncing = false;
 
   @override
   void initState() {
     super.initState();
     fetchPointSales();
+    _initOfflineListener();
+  }
+
+  void _initOfflineListener() {
+    _updateOfflineCount();
+    _offlineSubscription = AppConfig.isar.offlineTransactions.watchLazy().listen((_) {
+      _updateOfflineCount();
+    });
+  }
+
+  Future<void> _updateOfflineCount() async {
+    final count = await AppConfig.isar.offlineTransactions
+        .where()
+        .isSyncedEqualTo(false)
+        .count();
+    _offlineCount.value = count;
+  }
+
+  Future<void> _syncOfflineData() async {
+    if (_isSyncing) return;
+
+    final offlineTxns = await AppConfig.isar.offlineTransactions
+        .where()
+        .isSyncedEqualTo(false)
+        .findAll();
+    if (offlineTxns.isEmpty) {
+      BotToast.showText(text: "Sync လုပ်ရန် ဒေတာ မရှိပါ။");
+      return;
+    }
+
+    setState(() => _isSyncing = true);
+    BotToast.showText(text: "Syncing Offline Data...");
+    BotToast.showLoading();
+
+    int successCount = 0;
+    int failCount = 0;
+
+    final supabase = Supabase.instance.client;
+
+    for (var tx in offlineTxns) {
+      try {
+        if (tx.actionType == OfflineActionType.earn) {
+          final res = await supabase.rpc('add_fuel_points', params: {
+            'target_user_id': tx.targetUid,
+            'station_id': tx.stationId,
+            'fuel_type': tx.fuelType,
+            'amount_mmk': tx.amountMmk,
+            'v_voc_no': tx.vocNo,
+            'v_sale_type': tx.saleType,
+            'v_vehicle_no': tx.vehicleNo,
+            'v_payment_type': tx.paymentType,
+            'v_unit_price': tx.unitPrice,
+            'v_sale_liter': tx.saleLiter,
+          });
+
+          if (res['status'] == 'success') {
+            if (tx.dynamicTokenId != null) {
+              await supabase
+                  .from('qr_tokens')
+                  .update({'is_used': true}).eq('id', tx.dynamicTokenId!);
+            }
+            await AppConfig.isar.writeTxn(
+                () => AppConfig.isar.offlineTransactions.delete(tx.id));
+            successCount++;
+          } else {
+            throw res['message'] ?? 'Sync failed';
+          }
+        } else {
+          // Redeem logic
+          await supabase.rpc('process_reward_redemption', params: {
+            'target_user_id': tx.targetUid,
+            'target_reward_id': tx.rewardId,
+            'required_points': tx.requiredPoints,
+            'target_station_id': tx.stationId,
+          });
+
+          if (tx.dynamicTokenId != null) {
+            await supabase
+                .from('qr_tokens')
+                .update({'is_used': true}).eq('id', tx.dynamicTokenId!);
+          }
+          await AppConfig.isar.writeTxn(
+              () => AppConfig.isar.offlineTransactions.delete(tx.id));
+          successCount++;
+        }
+      } catch (e) {
+        failCount++;
+        print("Sync Error for ID ${tx.id}: $e");
+        tx.syncError = e.toString();
+        await AppConfig.isar.writeTxn(
+            () => AppConfig.isar.offlineTransactions.put(tx));
+      }
+    }
+
+    BotToast.closeAllLoading();
+    if (mounted) {
+      setState(() => _isSyncing = false);
+    }
+
+    if (failCount == 0) {
+      BotToast.showText(
+          text: "Sync အောင်မြင်ပါသည်။ ($successCount records pushed)",
+          contentColor: Colors.green);
+    } else {
+      BotToast.showText(
+          text: "Sync ပြီးဆုံး - $successCount အောင်မြင်၊ $failCount မအောင်မြင်ပါ။",
+          contentColor: Colors.orange);
+    }
+    
+    // Refresh history
+    fetchPointSales();
+  }
+
+  Widget _buildSyncBadge() {
+    return ValueListenableBuilder<int>(
+      valueListenable: _offlineCount,
+      builder: (context, count, _) {
+        if (count == 0 && !_isSyncing) return const SizedBox.shrink();
+
+        return InkWell(
+          onTap: _syncOfflineData,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: _isSyncing ? Colors.blueAccent : Colors.orangeAccent,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.2),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (_isSyncing)
+                  const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                else
+                  const Icon(Icons.sync, size: 18, color: Colors.white),
+                const SizedBox(width: 8),
+                Text(
+                  _isSyncing ? "Syncing..." : "$count Pending Scans",
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Future<void> fetchPointSales() async {
@@ -65,6 +234,8 @@ class _CollectPointScreenState extends State<CollectPointScreen> {
     _localStreamController.close();
     _searchController.dispose();
     _searchQuery.dispose();
+    _offlineSubscription?.cancel();
+    _offlineCount.dispose();
     super.dispose();
   }
 
@@ -73,7 +244,16 @@ class _CollectPointScreenState extends State<CollectPointScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      appBar: const MsAppBar(title: 'Customer Details', showBackButton: true),
+      appBar: MsAppBar(
+        title: 'Customer Details',
+        showBackButton: true,
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 16.0),
+            child: Center(child: _buildSyncBadge()),
+          ),
+        ],
+      ),
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -100,8 +280,14 @@ class _CollectPointScreenState extends State<CollectPointScreen> {
                 if (isMobile) {
                   return Stack(
                     children: [
+                      // Sync Badge for Mobile
+                      Positioned(
+                        top: 10,
+                        right: 16,
+                        child: _buildSyncBadge(),
+                      ),
                       Padding(
-                        padding: const EdgeInsets.all(16.0),
+                        padding: const EdgeInsets.only(top: 60.0, left: 16, right: 16, bottom: 16),
                         child: Column(
                           children: [
                             // --- Search Box with Suggestions ---
@@ -118,8 +304,9 @@ class _CollectPointScreenState extends State<CollectPointScreen> {
 
                                 return Autocomplete<String>(
                                   optionsBuilder: (textEditingValue) {
-                                    if (textEditingValue.text.isEmpty)
+                                    if (textEditingValue.text.isEmpty) {
                                       return const Iterable<String>.empty();
+                                    }
                                     return suggestions.where(
                                       (s) => s.toLowerCase().contains(
                                         textEditingValue.text.toLowerCase(),
@@ -314,9 +501,9 @@ class _CollectPointScreenState extends State<CollectPointScreen> {
                         ),
                       ),
                       if (status.isLoading)
-                        buildProgressOverlay(
-                          status.progress,
-                          status.data.length,
+                        ProgressOverlay(
+                          progress: status.progress,
+                          currentCount: status.data.length,
                         ),
                       Positioned(
                         bottom: 20,
@@ -367,9 +554,9 @@ class _CollectPointScreenState extends State<CollectPointScreen> {
                             ),
                           ),
                           if (status.isLoading)
-                            buildProgressOverlay(
-                              status.progress,
-                              status.data.length,
+                            ProgressOverlay(
+                              progress: status.progress,
+                              currentCount: status.data.length,
                             ),
                           Positioned(
                             bottom: 40,
@@ -851,8 +1038,9 @@ class _CheckAlreadyCollectedState extends State<CheckAlreadyCollected> {
             ),
           );
         }
-        if (snapshot.data == true)
+        if (snapshot.data == true) {
           return const Icon(Icons.check_circle, color: Colors.green, size: 24);
+        }
 
         final screenWidth = MediaQuery.of(context).size.width;
         final bool isMobile = screenWidth < 750;

@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -13,9 +12,7 @@ import 'package:station_msloyalty/Helper/FetchWithProgress.dart';
 import 'package:station_msloyalty/Helper/MsAppBar.dart';
 import 'package:station_msloyalty/Helper/PumpBySaleReport.dart';
 import 'package:station_msloyalty/Helper/SaleDetailReport.dart';
-import 'package:station_msloyalty/Model/BuildFuelTypeChip.dart';
 import 'package:station_msloyalty/Model/SaleLoadStatus.dart';
-import 'package:station_msloyalty/Model/SaleTypeModel.dart';
 import 'package:station_msloyalty/summary_view.dart';
 import 'package:station_msloyalty/Constants/StyleConstants.dart';
 import 'package:station_msloyalty/Screens/CheckAlreadyCollectedReport.dart';
@@ -36,12 +33,15 @@ class _ReportsScreen extends State<ReportsScreen> {
   final Set<int> _selectedIndices = {}; // Selected Indexes
   int? _lastSelectedIndex; // Last Selected Index
 
-  List<dynamic> _salesData = [];
+  final List<dynamic> _salesData = [];
 
   DateTimeRange? _selectedDateRange; // Date Range
   // Map<String, dynamic>? _sysControl;
   List<dynamic> _sysControlList = []; // List to hold API response
   bool isLoadingSidebar = false; // Sidebar loading state
+
+  List<Map<String, dynamic>> _stations = [];
+  String? _selectedStationId;
 
   //Range Text Controller for Time Closed
   final TextEditingController _rangeTimeClosedController =
@@ -60,6 +60,75 @@ class _ReportsScreen extends State<ReportsScreen> {
   final TextEditingController _endTimeController = TextEditingController(
     text: "23:59:59",
   );
+
+  // Table Filter & Sort State
+  String _searchVoucher = "";
+  String _searchVehicle = "";
+  String _filterFuelType = "ALL";
+  String _filterSaleType = "ALL";
+  bool _sortAscending = false;
+
+  // Derived filtered data
+  List<dynamic> get _filteredSalesData {
+    List<dynamic> filtered = List.from(_salesData);
+
+    // 1. Filter by Voucher
+    if (_searchVoucher.isNotEmpty) {
+      filtered = filtered
+          .where(
+            (sale) => sale['VocNo'].toString().toLowerCase().contains(
+              _searchVoucher.toLowerCase(),
+            ),
+          )
+          .toList();
+    }
+
+    // 2. Filter by Vehicle
+    if (_searchVehicle.isNotEmpty) {
+      filtered = filtered
+          .where(
+            (sale) => (sale['Vehical_No'] ?? '')
+                .toString()
+                .toLowerCase()
+                .contains(_searchVehicle.toLowerCase()),
+          )
+          .toList();
+    }
+
+    // 3. Filter by Fuel Type
+    if (_filterFuelType != "ALL") {
+      filtered = filtered
+          .where(
+            (sale) =>
+                (sale['FuelTypeName'] ?? '').toString() == _filterFuelType,
+          )
+          .toList();
+    }
+
+    // 4. Filter by Sale Type
+    if (_filterSaleType != "ALL") {
+      filtered = filtered
+          .where(
+            (sale) =>
+                (sale['Sale_Type_name'] ?? '').toString() == _filterSaleType,
+          )
+          .toList();
+    }
+
+    // 5. Sort by Date
+    filtered.sort((a, b) {
+      try {
+        DateTime dtA = _parseServerDateTime(a['S_Date']);
+        DateTime dtB = _parseServerDateTime(b['S_Date']);
+        return _sortAscending ? dtA.compareTo(dtB) : dtB.compareTo(dtA);
+      } catch (e) {
+        return 0;
+      }
+    });
+
+    return filtered;
+  }
+
   final StreamController<SalesLoadStatus> salesStreamController =
       StreamController<SalesLoadStatus>.broadcast();
 
@@ -76,6 +145,22 @@ class _ReportsScreen extends State<ReportsScreen> {
     }
   }
 
+  /// Parses date string from server. Handles cases where 'Z' might be missing.
+  DateTime _parseServerDateTime(String? dateStr) {
+    if (dateStr == null || dateStr.isEmpty) return DateTime.now();
+    try {
+      // Treat the server string as local time if no timezone indicator is present
+      // (This avoids the 6.5h offset since the server returns MMT strings)
+      if (dateStr.contains(' ') && !dateStr.contains('T')) {
+        dateStr = dateStr.replaceFirst(' ', 'T');
+      }
+      return DateTime.parse(dateStr);
+    } catch (e) {
+      debugPrint("Date Parse Error ($dateStr): $e");
+      return DateTime.now();
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -88,9 +173,32 @@ class _ReportsScreen extends State<ReportsScreen> {
 
     // ၂။ Selected Range ကို Initialize လုပ်ခြင်း
     _selectedDateRange = DateTimeRange(start: todayStart, end: todayEnd);
-    // ၃။ App စဖွင့်ချင်း Data ခေါ်ယူခြင်း
-    // ဤနေရာတွင် API နှစ်ခုလုံးကို တစ်ခါတည်း ခေါ်ပါမည်
-    _fetchInitialData(todayStart, todayEnd);
+    // ၃။ Station List ကိုသာ Initialize လုပ်ခြင်း (Data မခေါ်သေးပါ)
+    _fetchStations();
+  }
+
+  Future<void> _fetchStations() async {
+    try {
+      final response = await supabase
+          .from('stations')
+          .select('station_id, name')
+          .order('name');
+
+      if (mounted) {
+        setState(() {
+          _stations = List<Map<String, dynamic>>.from(response);
+          // HO User (level 1) သို့မဟုတ် Supervisor (level 2) ဖြစ်လျှင် ALL STATIONS ထည့်ပေးမယ်
+          if (AppConfig.currentUserLevel == 1 ||
+              AppConfig.currentUserLevel == 2) {
+            _stations.insert(0, {'station_id': 'ALL', 'name': 'ALL STATIONS'});
+          }
+          // Default stationId ကို null ထားမယ် (User ကို ရွေးခိုင်းမယ်)
+          _selectedStationId = null;
+        });
+      }
+    } catch (e) {
+      debugPrint("Error fetching stations: $e");
+    }
   }
 
   // Initial Data Fetching
@@ -147,7 +255,7 @@ class _ReportsScreen extends State<ReportsScreen> {
     List<int> sortedIndices = _selectedIndices.toList()..sort();
 
     // ၂။ Start Date အတွက် ပထမဆုံးရွေးတဲ့ Item အချိန်ကို ယူမယ်
-    DateTime startDT = DateTime.parse(
+    DateTime startDT = _parseServerDateTime(
       _sysControlList[sortedIndices.first]['Sdate'],
     );
 
@@ -160,7 +268,9 @@ class _ReportsScreen extends State<ReportsScreen> {
       endDT = DateTime(now.year, now.month, now.day, 23, 59, 59);
     } else {
       // အများကြီးဆိုရင် နောက်ဆုံး Item ရဲ့ အချိန်ကို ယူမယ်
-      endDT = DateTime.parse(_sysControlList[sortedIndices.last]['Sdate']);
+      endDT = _parseServerDateTime(
+        _sysControlList[sortedIndices.last]['Sdate'],
+      );
     }
 
     // ၄။ Controller များထဲသို့ Set လုပ်ခြင်း
@@ -179,21 +289,130 @@ class _ReportsScreen extends State<ReportsScreen> {
 
   //Search Sale By Date
   Future<void> _searchSalesByDate(DateTime start, DateTime end) async {
-    // API အတွက် Format ပြောင်းခြင်း
+    if (_selectedStationId == null) {
+      _showStationRequiredSnackBar();
+      return;
+    }
+    // Use Local time for API parameters (as server expects MMT)
     final String startStr = DateFormat('yyyy-MM-dd HH:mm:ss').format(start);
     final String endStr = DateFormat('yyyy-MM-dd HH:mm:ss').format(end);
 
     // Node.js API Route (Search endpoint ကို သုံးထားပါသည်)
-    final url =
-        '${AppConfig.apiUrl}/api/sales/search?startDate=$startStr&endDate=$endStr';
 
     // စတင်ချိန်မှာ Loading True နဲ့ 0% ပို့လိုက်မယ်
     salesStreamController.add(
       SalesLoadStatus(data: [], progress: 0.0, isLoading: true),
     );
 
+    _salesData.clear();
+
     try {
-      await fetchWithProgress(url, _salesData, salesStreamController);
+      if (_selectedStationId == 'ALL') {
+        // Initialize station progress list
+        final targetStations = _stations
+            .where((s) => s['station_id'] != 'ALL')
+            .toList();
+        List<Map<String, dynamic>> progressList = targetStations
+            .map(
+              (s) => {
+                'station_id': s['station_id'],
+                'name': s['name'],
+                'status': 'pending', // pending, loading, done
+              },
+            )
+            .toList();
+
+        for (int i = 0; i < targetStations.length; i++) {
+          final sId = targetStations[i]['station_id'];
+          final sName = targetStations[i]['name'];
+
+          // Update status to loading
+          progressList[i]['status'] = 'loading';
+          salesStreamController.add(
+            SalesLoadStatus(
+              data: _salesData,
+              progress: i / targetStations.length,
+              isLoading: true,
+              stationProgress: progressList,
+            ),
+          );
+
+          // API Call for this station
+          final stationUrl =
+              '${AppConfig.apiUrl}/api/sales/search?startDate=$startStr&endDate=$endStr&stationId=$sId';
+
+          final originalId = AppConfig.stationId;
+          final originalDb = AppConfig.database;
+          AppConfig.stationId = sId;
+          AppConfig.database = sId;
+
+          List<dynamic> stationSales = [];
+          await fetchWithProgress(
+            stationUrl,
+            stationSales,
+            salesStreamController,
+            stationProgress: progressList,
+            stayLoading: i < targetStations.length - 1,
+          );
+
+          AppConfig.stationId = originalId;
+          AppConfig.database = originalDb;
+
+          for (var sale in stationSales) {
+            sale['station_id'] = sId;
+            sale['station_name'] = sName;
+            // Normalize Date to Local for sorting and display
+            if (sale['S_Date'] != null) {
+              sale['S_Date'] = _parseServerDateTime(sale['S_Date']).toString();
+            }
+          }
+
+          _salesData.addAll(stationSales);
+
+          // Update status to done
+          progressList[i]['status'] = 'done';
+
+          salesStreamController.add(
+            SalesLoadStatus(
+              data: _salesData,
+              progress: (i + 1) / targetStations.length,
+              isLoading: i < targetStations.length - 1,
+              stationProgress: progressList,
+            ),
+          );
+        }
+      } else {
+        // Specific station
+        final url =
+            '${AppConfig.apiUrl}/api/sales/search?startDate=$startStr&endDate=$endStr&stationId=$_selectedStationId';
+        final originalId = AppConfig.stationId;
+        final originalDb = AppConfig.database;
+        AppConfig.stationId = _selectedStationId!;
+        AppConfig.database = _selectedStationId!;
+
+        await fetchWithProgress(url, _salesData, salesStreamController);
+
+        // Add station info and normalize dates
+        final sName = _stations.firstWhere(
+          (s) => s['station_id'] == _selectedStationId,
+        )['name'];
+        for (var sale in _salesData) {
+          sale['station_id'] = _selectedStationId;
+          sale['station_name'] = sName;
+          if (sale['S_Date'] != null) {
+            // We need to be careful as _salesData might have been populated by fetchWithProgress
+            // already. But here _salesData was empty before fetchWithProgress in this branch.
+            // Actually _salesData.clear() was called @ 272.
+            sale['S_Date'] = _parseServerDateTime(sale['S_Date']).toString();
+          }
+        }
+
+        AppConfig.stationId = originalId;
+        AppConfig.database = originalDb;
+      }
+
+      // Sync System Control Logs as well
+      _fetchSysControlByRange(start, end);
     } catch (e) {
       debugPrint("Sales Fetch Error: $e");
     }
@@ -201,23 +420,81 @@ class _ReportsScreen extends State<ReportsScreen> {
 
   // Sidebar (System Control Logs) အတွက် Data Fetching
   Future<void> _fetchSysControlByRange(DateTime start, DateTime end) async {
-    // Loading စတင်ဖွင့်ခြင်း
+    if (_selectedStationId == null) return;
     setState(() => isLoadingSidebar = true);
+    _sysControlList.clear();
 
+    // Use Local time for API parameters (as server expects MMT)
     final String startStr = DateFormat('yyyy-MM-dd HH:mm:ss').format(start);
     final String endStr = DateFormat('yyyy-MM-dd HH:mm:ss').format(end);
 
-    final url = Uri.parse(
-      '${AppConfig.apiUrl}/api/system-control/search?start=$startStr&end=$endStr',
-    );
-
     try {
-      final response = await http.get(url);
-      if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
-        setState(() {
-          _sysControlList = data;
-        });
+      if (_selectedStationId == 'ALL') {
+        final targetStations = _stations
+            .where((s) => s['station_id'] != 'ALL')
+            .toList();
+        for (var station in targetStations) {
+          final sId = station['station_id'];
+          final sName = station['name'];
+
+          final url = Uri.parse(
+            '${AppConfig.apiUrl}/api/system-control/search?start=$startStr&end=$endStr&stationId=$sId',
+          );
+
+          final originalId = AppConfig.stationId;
+          final originalDb = AppConfig.database;
+          AppConfig.stationId = sId;
+          AppConfig.database = sId;
+
+          final response = await http.get(url, headers: AppConfig.headers);
+          AppConfig.stationId = originalId;
+          AppConfig.database = originalDb;
+
+          if (response.statusCode == 200) {
+            final List<dynamic> data = json.decode(response.body);
+            for (var item in data) {
+              item['station_id'] = sId;
+              item['station_name'] = sName;
+              if (item['Sdate'] != null) {
+                item['Sdate'] = _parseServerDateTime(
+                  item['Sdate'].toString(),
+                ).toString();
+              }
+            }
+            _sysControlList.addAll(data);
+          }
+        }
+        setState(() {});
+      } else {
+        final url = Uri.parse(
+          '${AppConfig.apiUrl}/api/system-control/search?start=$startStr&end=$endStr&stationId=$_selectedStationId',
+        );
+        final originalId = AppConfig.stationId;
+        final originalDb = AppConfig.database;
+        AppConfig.stationId = _selectedStationId!;
+        AppConfig.database = _selectedStationId!;
+        final response = await http.get(url, headers: AppConfig.headers);
+        AppConfig.stationId = originalId;
+        AppConfig.database = originalDb;
+
+        if (response.statusCode == 200) {
+          final List<dynamic> data = json.decode(response.body);
+          final sName = _stations.firstWhere(
+            (s) => s['station_id'] == _selectedStationId,
+          )['name'];
+          for (var item in data) {
+            item['station_id'] = _selectedStationId;
+            item['station_name'] = sName;
+            if (item['Sdate'] != null) {
+              item['Sdate'] = _parseServerDateTime(
+                item['Sdate'].toString(),
+              ).toString();
+            }
+          }
+          setState(() {
+            _sysControlList = data;
+          });
+        }
       }
     } catch (e) {
       debugPrint("Sidebar Error: $e");
@@ -227,6 +504,64 @@ class _ReportsScreen extends State<ReportsScreen> {
         setState(() => isLoadingSidebar = false);
       }
     }
+  }
+
+  Widget _fieldSearchInput(String hint, Function(String) onChanged) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 4),
+      height: 30,
+      child: TextField(
+        onChanged: onChanged,
+        style: const TextStyle(fontSize: 11),
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: TextStyle(
+            color: isDark ? Colors.white24 : Colors.grey,
+            fontSize: 10,
+          ),
+          isDense: true,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 8,
+            vertical: 8,
+          ),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
+        ),
+      ),
+    );
+  }
+
+  Widget _fieldDropdownFilter(
+    String value,
+    List<String> options,
+    Function(String?) onChanged,
+  ) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 4),
+      height: 30,
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      decoration: BoxDecoration(
+        border: Border.all(
+          color: isDark ? Colors.white24 : Colors.grey.shade400,
+        ),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: options.contains(value) ? value : options.first,
+          isExpanded: true,
+          style: TextStyle(
+            fontSize: 10,
+            color: isDark ? Colors.white : Colors.black,
+          ),
+          items: options
+              .map((opt) => DropdownMenuItem(value: opt, child: Text(opt)))
+              .toList(),
+          onChanged: onChanged,
+        ),
+      ),
+    );
   }
 
   // Sales Data ကို Sale Type အလိုက် ခွဲခြားတွက်ချက်ခြင်း
@@ -287,14 +622,43 @@ class _ReportsScreen extends State<ReportsScreen> {
 
   // နောက်ဆုံး Sale ၂၀ ကို API မှ ဆွဲယူခြင်း
   Future<void> _fetchLatestSales() async {
+    if (_selectedStationId == null) {
+      _showStationRequiredSnackBar();
+      return;
+    }
+
+    final dynamicUrl = '$apiUrl?stationId=$_selectedStationId';
+
     // စတင်ချိန်မှာ Loading True နဲ့ 0% ပို့လိုက်မယ်
     salesStreamController.add(
       SalesLoadStatus(data: [], progress: 0.0, isLoading: true),
     );
+
+    final originalId = AppConfig.stationId;
+    final originalDb = AppConfig.database;
+    AppConfig.stationId = _selectedStationId!;
+    AppConfig.database = _selectedStationId!;
+
     try {
-      await fetchWithProgress(apiUrl, _salesData, salesStreamController);
+      final List<dynamic> latestSales = [];
+      await fetchWithProgress(dynamicUrl, latestSales, salesStreamController);
+
+      // Normalize dates and add station info
+      for (var sale in latestSales) {
+        if (sale['S_Date'] != null) {
+          sale['S_Date'] = _parseServerDateTime(sale['S_Date']).toString();
+        }
+        sale['station_id'] = _selectedStationId;
+        sale['station_name'] = AppConfig.stationName;
+      }
+
+      _salesData.clear();
+      _salesData.addAll(latestSales);
     } catch (e) {
       debugPrint("Fetch Error: $e");
+    } finally {
+      AppConfig.stationId = originalId;
+      AppConfig.database = originalDb;
     }
   }
 
@@ -313,47 +677,63 @@ class _ReportsScreen extends State<ReportsScreen> {
           // လက်ရှိ status ကို ယူမယ် (မရှိသေးရင် default status ပေးထားမယ်)
           final status =
               snapshot.data ??
-              SalesLoadStatus(data: [], progress: 0.0, isLoading: true);
+              SalesLoadStatus(data: [], progress: 0.0, isLoading: false);
 
           final isMobile = MediaQuery.of(context).size.width < 1000;
-          
+
           return Stack(
             children: [
               isMobile
                   ? ListView(
                       children: [
                         _buildDateSearchRow(isMobile, status.data),
-                        SummaryView(
-                          saleSummaryTable: _buildTypeSummaryTable(isMobile),
-                          fuelSummaryTable: _buildFuelSummaryTable(isMobile),
-                        ),
-                        _buildHeaderInfo(isMobile),
-                        _salesData.isEmpty
-                            ? _buildEmptyState()
-                            : _buildMobileShowDetailButton(status.data),
+                        if (_selectedStationId != null) ...[
+                          SummaryView(
+                            saleSummaryTable: _buildTypeSummaryTable(isMobile),
+                            fuelSummaryTable: _buildFuelSummaryTable(isMobile),
+                            stationSummaryTable: _selectedStationId == 'ALL'
+                                ? _buildStationSummaryTable(isMobile)
+                                : null,
+                          ),
+                          _buildHeaderInfo(isMobile),
+                          _salesData.isEmpty
+                              ? _buildEmptyState()
+                              : _buildMobileShowDetailButton(status.data),
+                        ] else
+                          _buildInitialSelectStationState(),
                       ],
                     )
                   : Column(
                       children: [
                         _buildDateSearchRow(isMobile, status.data),
-                        SummaryView(
-                          saleSummaryTable: _buildTypeSummaryTable(isMobile),
-                          fuelSummaryTable: _buildFuelSummaryTable(isMobile),
-                        ),
-                        _buildHeaderInfo(isMobile),
-                        Expanded(
-                          flex: 1,
-                          child: _salesData.isEmpty
-                              ? _buildEmptyState()
-                              : _buildDataTable(status.data, status.isLoading),
-                        ),
+                        if (_selectedStationId != null) ...[
+                          SummaryView(
+                            saleSummaryTable: _buildTypeSummaryTable(isMobile),
+                            fuelSummaryTable: _buildFuelSummaryTable(isMobile),
+                            stationSummaryTable: _selectedStationId == 'ALL'
+                                ? _buildStationSummaryTable(isMobile)
+                                : null,
+                          ),
+                          _buildHeaderInfo(isMobile),
+                          Expanded(
+                            flex: 1,
+                            child: _salesData.isEmpty
+                                ? _buildEmptyState()
+                                : _buildDataTable(
+                                    status.data,
+                                    status.isLoading,
+                                  ),
+                          ),
+                        ] else
+                          Expanded(child: _buildInitialSelectStationState()),
                       ],
                     ),
               Visibility(
                 visible: status.isLoading,
-                child: buildProgressOverlay(
-                  status.progress,
-                  status.data.length,
+                child: ProgressOverlay(
+                  progress: status.progress,
+                  currentCount: status.data.length,
+                  stationProgress: status.stationProgress,
                 ),
               ),
             ],
@@ -453,37 +833,154 @@ class _ReportsScreen extends State<ReportsScreen> {
   }
 
   // Build Data Table
-  Widget _buildDataTable(List<dynamic> data, bool isLoading) {
+  Widget _buildDataTable(List<dynamic> rawData, bool isLoading) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final headerColor = isDark ? StyleConstants.darkSurface : Colors.white;
     final textColor = isDark ? Colors.white : Colors.black;
 
+    // Use filtered data
+    final data = _filteredSalesData;
+
+    // Dynamic Filter Options
+    final fuelTypes = [
+      "ALL",
+      ..._salesData
+          .map((s) => s['FuelTypeName']?.toString() ?? 'Unknown')
+          .toSet(),
+    ];
+    final saleTypes = [
+      "ALL",
+      ..._salesData
+          .map((s) => s['Sale_Type_name']?.toString() ?? 'Unknown')
+          .toSet(),
+    ];
+
     return Column(
       children: [
-        // ၁။ Fixed Header အပိုင်း (ဒီကောင်က Scroll မဖြစ်ပါ)
+        // ၁။ Header & Filter အပိုင်း
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: Container(
-            width: 1200,
+            width: 1400,
             decoration: BoxDecoration(
               color: headerColor,
               border: Border.all(
                 color: (isDark ? Colors.white : Colors.teal).withOpacity(0.2),
               ),
             ),
-            padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 8),
-            child: Row(
+            child: Column(
               children: [
-                _buildHeaderCell('No', 1, textColor),
-                _buildHeaderCell('Voucher No', 2, textColor),
-                _buildHeaderCell('Fuel Type', 2, textColor),
-                _buildHeaderCell('Price', 2, textColor),
-                _buildHeaderCell('Date & Time', 3, textColor),
-                _buildHeaderCell('Vehicle No', 2, textColor),
-                _buildHeaderCell('Sale Type', 2, textColor),
-                _buildHeaderCell('Liter', 2, textColor),
-                _buildHeaderCell('Amount', 2, textColor),
-                _buildHeaderCell('Action', 2, textColor),
+                // Main Header Row
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 12,
+                    horizontal: 8,
+                  ),
+                  child: Row(
+                    children: [
+                      _buildHeaderCell('No', 1, textColor),
+                      _buildHeaderCell('Station', 2, textColor),
+                      _buildHeaderCell('Voucher No', 2, textColor),
+                      _buildHeaderCell('Fuel Type', 2, textColor),
+                      _buildHeaderCell('Price', 2, textColor),
+                      // Sorting Toggle for Date & Time
+                      Expanded(
+                        flex: 3,
+                        child: InkWell(
+                          onTap: () =>
+                              setState(() => _sortAscending = !_sortAscending),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                'Date & Time',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  color: textColor,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Icon(
+                                _sortAscending
+                                    ? Icons.arrow_upward
+                                    : Icons.arrow_downward,
+                                size: 14,
+                                color: Colors.teal,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      _buildHeaderCell('Vehicle No', 2, textColor),
+                      _buildHeaderCell('Sale Type', 2, textColor),
+                      _buildHeaderCell('Liter', 2, textColor),
+                      _buildHeaderCell('Amount', 2, textColor),
+                      _buildHeaderCell('Action', 2, textColor),
+                    ],
+                  ),
+                ),
+                // Filter Search Row
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 4,
+                    horizontal: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.black12 : Colors.grey.shade50,
+                    border: Border(
+                      top: BorderSide(
+                        color: (isDark ? Colors.white : Colors.teal)
+                            .withOpacity(0.1),
+                      ),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Expanded(flex: 1, child: SizedBox()), // No
+                      const Expanded(flex: 2, child: SizedBox()), // Station
+                      // Voucher Search
+                      Expanded(
+                        flex: 2,
+                        child: _fieldSearchInput(
+                          "Search Voucher",
+                          (val) => setState(() => _searchVoucher = val),
+                        ),
+                      ),
+                      // Fuel Type Filter
+                      Expanded(
+                        flex: 2,
+                        child: _fieldDropdownFilter(
+                          _filterFuelType,
+                          fuelTypes,
+                          (val) => setState(() => _filterFuelType = val!),
+                        ),
+                      ),
+                      const Expanded(flex: 2, child: SizedBox()), // Price
+                      const Expanded(flex: 3, child: SizedBox()), // Date
+                      // Vehicle Search
+                      Expanded(
+                        flex: 2,
+                        child: _fieldSearchInput(
+                          "Search Vehicle",
+                          (val) => setState(() => _searchVehicle = val),
+                        ),
+                      ),
+                      // Sale Type Filter
+                      Expanded(
+                        flex: 2,
+                        child: _fieldDropdownFilter(
+                          _filterSaleType,
+                          saleTypes,
+                          (val) => setState(() => _filterSaleType = val!),
+                        ),
+                      ),
+                      const Expanded(flex: 2, child: SizedBox()), // Liter
+                      const Expanded(flex: 2, child: SizedBox()), // Amount
+                      const Expanded(flex: 2, child: SizedBox()), // Action
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
@@ -498,129 +995,145 @@ class _ReportsScreen extends State<ReportsScreen> {
               : SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: SizedBox(
-                    width: 1200, // Fixed width for horizontal scrolling
+                    width: 1400, // Fixed width for horizontal scrolling
                     child: ListView.builder(
-                        itemCount: data.length,
-                        itemBuilder: (context, index) {
-                          final isDark =
-                              Theme.of(context).brightness == Brightness.dark;
-                          final sale = data[index];
-                          final bool isEven = index % 2 == 0;
-                          final Color rowColor = isEven
-                              ? (isDark
-                                    ? StyleConstants.darkBg
-                                    : Colors.blueGrey.shade50)
-                              : (isDark ? StyleConstants.darkSurface : Colors.white);
-                          return Container(
-                            padding: const EdgeInsets.symmetric(
-                              vertical: 12,
-                              horizontal: 15,
-                            ),
-                            decoration: BoxDecoration(
-                              color: rowColor,
-                              border: Border(
-                                bottom: BorderSide(
-                                  color:
-                                      (isDark ? Colors.white : Colors.grey.shade300)
-                                          .withOpacity(0.1),
-                                ),
-                                left: BorderSide(
-                                  color: Colors.grey.shade300,
-                                ), // ဘယ်ဘက်မျဉ်း
-                                right: BorderSide(
-                                  color: Colors.grey.shade300,
-                                ), // ညာဘက်မျဉ်း
+                      itemCount: data.length,
+                      itemBuilder: (context, index) {
+                        final isDark =
+                            Theme.of(context).brightness == Brightness.dark;
+                        final sale = data[index];
+                        final bool isEven = index % 2 == 0;
+                        final Color rowColor = isEven
+                            ? (isDark
+                                  ? StyleConstants.darkBg
+                                  : Colors.blueGrey.shade50)
+                            : (isDark
+                                  ? StyleConstants.darkSurface
+                                  : Colors.white);
+                        return Container(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 12,
+                            horizontal: 15,
+                          ),
+                          decoration: BoxDecoration(
+                            color: rowColor,
+                            border: Border(
+                              bottom: BorderSide(
+                                color:
+                                    (isDark
+                                            ? Colors.white
+                                            : Colors.grey.shade300)
+                                        .withOpacity(0.1),
                               ),
+                              left: BorderSide(
+                                color: Colors.grey.shade300,
+                              ), // ဘယ်ဘက်မျဉ်း
+                              right: BorderSide(
+                                color: Colors.grey.shade300,
+                              ), // ညာဘက်မျဉ်း
                             ),
-                            child: Row(
-                              children: [
-                                _buildTableCell(
-                                  '${index + 1}',
-                                  1,
-                                  isText: true,
-                                ), // အမှတ်စဉ်
-                                _buildTableCell(
-                                  '${sale['VocNo']}',
-                                  2,
-                                  isText: true,
-                                ), // Invoice No
-                                dataCell(
-                                  "${sale['FuelTypeName']}",
-                                  150,
-                                  cardColor: getFuelColor(sale['FuelTypeName'] ?? ''),
-                                  showRightBorder: true,
-                                  alignment: Alignment
-                                      .center, // Sale Type Badge ကိုတော့ အလယ်မှာပဲထားမယ်
+                          ),
+                          child: Row(
+                            children: [
+                              _buildTableCell(
+                                '${index + 1}',
+                                1,
+                                isText: true,
+                              ), // အမှတ်စဉ်
+                              _buildTableCell(
+                                '${sale['station_name'] ?? '-'} (${sale['station_id'] ?? '-'})',
+                                2,
+                                isText: true,
+                              ),
+                              _buildTableCell(
+                                '${sale['VocNo']}',
+                                2,
+                                isText: true,
+                              ), // Invoice No
+                              dataCell(
+                                "${sale['FuelTypeName']}",
+                                150,
+                                cardColor: getFuelColor(
+                                  sale['FuelTypeName'] ?? '',
                                 ),
-                                // ယနေ့ပေါက်ဈေး (D1_FuelType မှလာသော SalePrice)
-                                _buildTableCell(
-                                  NumberFormat(
-                                    '#,###',
-                                  ).format(sale['TodayPrice'] ?? 0),
-                                  2,
-                                  isNumeric: true,
+                                showRightBorder: true,
+                                alignment: Alignment
+                                    .center, // Sale Type Badge ကိုတော့ အလယ်မှာပဲထားမယ်
+                              ),
+                              // ယနေ့ပေါက်ဈေး (D1_FuelType မှလာသော SalePrice)
+                              _buildTableCell(
+                                NumberFormat(
+                                  '#,###',
+                                ).format(sale['TodayPrice'] ?? 0),
+                                2,
+                                isNumeric: true,
+                              ),
+                              _buildTableCell(
+                                DateFormat(
+                                  'dd-MM-yy HH:mm:ss',
+                                ).format(_parseServerDateTime(sale['S_Date'])),
+                                3,
+                              ),
+                              _buildTableCell(
+                                '${sale['Vehical_No'] ?? '-'}',
+                                2,
+                                isText: true,
+                              ), // Vehicle No
+                              // _buildTableCell('${sale['Sale_Type_name'] ?? '-'}', 2),
+                              dataCell(
+                                "${sale['Sale_Type_name']}",
+                                150,
+                                cardColor: getSaleTypeColor(
+                                  sale['Sale_Type_name'] ?? '',
                                 ),
-                                _buildTableCell(
-                                  DateFormat(
-                                    'dd-MM-yy HH:mm:ss',
-                                  ).format(DateTime.parse(sale['S_Date'])),
-                                  3,
+                                showRightBorder: true,
+                                alignment: Alignment
+                                    .center, // Sale Type Badge ကိုတော့ အလယ်မှာပဲထားမယ်
+                              ),
+
+                              _buildTableCell(
+                                '${double.tryParse(sale['SALELITER'].toString())?.toStringAsFixed(2)}',
+                                2,
+                              ),
+                              _buildTableCell(
+                                NumberFormat('#,###').format(
+                                  double.tryParse(
+                                        sale['TotalPrice'].toString(),
+                                      ) ??
+                                      0,
                                 ),
-                                _buildTableCell(
-                                  '${sale['Vehical_No'] ?? '-'}',
-                                  2,
-                                  isText: true,
-                                ), // Vehicle No
-                                // _buildTableCell('${sale['Sale_Type_name'] ?? '-'}', 2),
-                                dataCell(
-                                  "${sale['Sale_Type_name']}",
-                                  150,
-                                  cardColor: getSaleTypeColor(
-                                    sale['Sale_Type_name'] ?? '',
-                                  ),
-                                  showRightBorder: true,
-                                  alignment: Alignment
-                                      .center, // Sale Type Badge ကိုတော့ အလယ်မှာပဲထားမယ်
-                                ),
-      
-                                _buildTableCell(
-                                  '${double.tryParse(sale['SALELITER'].toString())?.toStringAsFixed(2)}',
-                                  2,
-                                ),
-                                _buildTableCell(
-                                  NumberFormat('#,###').format(
-                                    double.tryParse(sale['TotalPrice'].toString()) ??
-                                        0,
-                                  ),
-                                  2,
-                                  isNumeric: true,
-                                ),
-                                sale['Sale_Type_name'] == 'Cash Sale' ||
-                                        sale['Sale_Type_name'] == 'ePayment'
-                                    ? _buildTableCell(
-                                        CheckAlreadyCollectedReport(sale: sale, supabase: supabase),
-                                        2,
-                                        isAction: true,
-                                      )
-                                    : _buildTableCell(
-                                        IconButton(
-                                          onPressed: null,
-                                          icon: const Icon(
-                                            Icons.not_interested_rounded,
-                                            size: 20,
-                                            color: Colors.red,
-                                          ),
-                                          tooltip:
-                                              '${sale['Sale_Type_name']} အတွက် ခွင့်မပြုပါ',
-                                        ),
-                                        2,
-                                        isAction: true,
+                                2,
+                                isNumeric: true,
+                              ),
+                              sale['Sale_Type_name'] == 'Cash Sale' ||
+                                      sale['Sale_Type_name'] == 'ePayment'
+                                  ? _buildTableCell(
+                                      CheckAlreadyCollectedReport(
+                                        sale: sale,
+                                        supabase: supabase,
                                       ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
+                                      2,
+                                      isAction: true,
+                                    )
+                                  : _buildTableCell(
+                                      IconButton(
+                                        onPressed: null,
+                                        icon: const Icon(
+                                          Icons.not_interested_rounded,
+                                          size: 20,
+                                          color: Colors.red,
+                                        ),
+                                        tooltip:
+                                            '${sale['Sale_Type_name']} အတွက် ခွင့်မပြုပါ',
+                                      ),
+                                      2,
+                                      isAction: true,
+                                    ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
                   ),
                 ),
         ),
@@ -680,9 +1193,9 @@ class _ReportsScreen extends State<ReportsScreen> {
     final sortedEntries = summaryData.entries.toList()
       ..sort((a, b) => b.value['amount']!.compareTo(a.value['amount']!));
 
-    return Container(
-      width: isMobile 
-          ? double.infinity 
+    return SizedBox(
+      width: isMobile
+          ? double.infinity
           : MediaQuery.of(context).size.width * 0.5 - 20,
       child: Card(
         elevation: 4,
@@ -782,9 +1295,9 @@ class _ReportsScreen extends State<ReportsScreen> {
     final sortedFuelEntries = fuelData.entries.toList()
       ..sort((a, b) => b.value['amount']!.compareTo(a.value['amount']!));
 
-    return Container(
-      width: isMobile 
-          ? double.infinity 
+    return SizedBox(
+      width: isMobile
+          ? double.infinity
           : MediaQuery.of(context).size.width * 0.5 - 20,
       child: Card(
         elevation: 4,
@@ -884,7 +1397,11 @@ class _ReportsScreen extends State<ReportsScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.list_alt_rounded, size: 64, color: Colors.teal.withOpacity(0.5)),
+            Icon(
+              Icons.list_alt_rounded,
+              size: 64,
+              color: Colors.teal.withOpacity(0.5),
+            ),
             const SizedBox(height: 16),
             Text(
               "${data.length} Records Found",
@@ -917,7 +1434,9 @@ class _ReportsScreen extends State<ReportsScreen> {
                   backgroundColor: Colors.teal,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 18),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
                   elevation: 4,
                 ),
               ),
@@ -946,84 +1465,195 @@ class _ReportsScreen extends State<ReportsScreen> {
     );
   }
 
-  Color _getTypeColor(String? typeName) {
+  Widget _buildInitialSelectStationState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(40.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.location_on_outlined,
+              size: 80,
+              color: Colors.teal.withOpacity(0.5),
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              "ကျေးဇူးပြု၍ Station အရင်ရွေးချယ်ပါ",
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              "အစီရင်ခံစာများကြည့်ရှုရန် အပေါ်ရှိ Station Selector မှ\nသက်ဆိုင်ရာ Station ကို ရွေးချယ်ပေးပါ",
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey, fontSize: 16),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Color getSaleTypeColor(String? typeName) {
     switch (typeName?.toUpperCase()) {
-      case 'Cash Sale':
+      case 'CASH SALE':
         return Colors.green;
-      case 'Credit Sale':
+      case 'CREDIT SALE':
         return Colors.orange;
       case 'FOC':
         return Colors.red;
+      case 'EPAYMENT':
+        return Colors.blue;
       default:
         return Colors.blueGrey;
     }
   }
 
+  Color getFuelColor(String fuelName) {
+    if (fuelName.contains('92')) return Colors.orange;
+    if (fuelName.contains('95')) return Colors.red;
+    if (fuelName.contains('Diesel')) return Colors.green;
+    if (fuelName.contains('Premium')) return Colors.blue;
+    return Colors.blueGrey;
+  }
+
   // Sidebar Widget
   Widget _buildRightSidebar() {
-    return Drawer(
-      width: 250,
+    final bool isMobile = MediaQuery.of(context).size.width < 900;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
+    return Drawer(
+      width: isMobile ? 300 : 350,
+      backgroundColor: isDark ? StyleConstants.darkBg : StyleConstants.lightBg,
       child: Column(
         children: [
-          DrawerHeader(
-            decoration: BoxDecoration(color: Colors.blueGrey.shade900),
-            child: InkWell(
-              // Header ကို နှိပ်ရင်လည်း Date ရွေးလို့ရအောင် လုပ်ထားတယ်
-              onTap: () => _pickDateRange(context),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(
+          // 1. Custom Header with Glassmorphism
+          Container(
+            height: 180,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: isDark
+                    ? [const Color(0xFF1E293B), const Color(0xFF0F172A)]
+                    : [const Color(0xFF1B4F72), const Color(0xFF2C3E50)],
+              ),
+            ),
+            child: Stack(
+              children: [
+                Positioned(
+                  right: -20,
+                  top: -20,
+                  child: Icon(
                     Icons.history_toggle_off,
-                    color: Colors.white,
-                    size: 40,
+                    size: 150,
+                    color: Colors.white.withOpacity(0.05),
                   ),
-                  const SizedBox(height: 10),
-                  const Text(
-                    "System Control Logs",
-                    style: TextStyle(color: Colors.white, fontSize: 18),
-                  ),
-                  const SizedBox(height: 5),
-                  // လက်ရှိရွေးထားတဲ့ Range ကို ပြပေးမယ်
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white10,
-                      borderRadius: BorderRadius.circular(5),
-                    ),
-                    child: Row(
+                ),
+                SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.date_range, color: Colors.white),
-                        Text(
-                          "${DateFormat('dd/MM/yyyy').format(_selectedDateRange!.start)} - ${DateFormat('dd/MM/yyyy').format(_selectedDateRange!.end)}",
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.normal,
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Icon(
+                                Icons.history,
+                                color: Colors.white,
+                                size: 24,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            const Text(
+                              "Control Logs",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        // Date Range Badge
+                        InkWell(
+                          onTap: () => _pickDateRange(context),
+                          child: GlassContainer(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                            opacity: 0.1,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.calendar_month,
+                                  color: Colors.white70,
+                                  size: 16,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  "${DateFormat('dd/MM/yy').format(_selectedDateRange!.start)} - ${DateFormat('dd/MM/yy').format(_selectedDateRange!.end)}",
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                const Icon(
+                                  Icons.edit,
+                                  color: Colors.white54,
+                                  size: 12,
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ],
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
+
+          // 2. Search / Filter Logs bar (Optional - for future use)
+
+          // 3. Log List
           Expanded(
             child: _sysControlList.isEmpty
-                ? const Center(child: Text("No records found in this range."))
-                : // UI ထဲက ListView
-                  GestureDetector(
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.query_stats,
+                          size: 48,
+                          color: Colors.grey.withOpacity(0.3),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          "No logs found in this range",
+                          style: TextStyle(color: Colors.grey.withOpacity(0.8)),
+                        ),
+                      ],
+                    ),
+                  )
+                : GestureDetector(
                     onVerticalDragStart: (details) {
-                      // Mouse စဖိတဲ့နေရာက Y position ကို မှတ်မယ်
                       _dragStartY = details.localPosition.dy;
-
-                      // Shift မဖိထားရင် အဟောင်းတွေကို ရှင်းပစ်ချင်ရင် ဒီမှာရှင်းနိုင်ပါတယ်
                       if (!HardwareKeyboard.instance.isShiftPressed) {
                         setState(() => _selectedIndices.clear());
                       }
@@ -1031,9 +1661,7 @@ class _ReportsScreen extends State<ReportsScreen> {
                     onVerticalDragUpdate: (details) {
                       double currentY = details.localPosition.dy;
                       double itemHeight =
-                          70.0; // သားကြီးရဲ့ ListTile အမြင့် (Card margin ပါတွက်ပါ)
-
-                      // လက်ရှိ Mouse ရောက်နေတဲ့နေရာရဲ့ Index ကို တွက်မယ်
+                          80.0; // Estimate for GlassContainer + Padding
                       int startIndex = (_dragStartY / itemHeight).floor();
                       int currentIndex = (currentY / itemHeight).floor();
 
@@ -1044,80 +1672,154 @@ class _ReportsScreen extends State<ReportsScreen> {
                         int end = startIndex > currentIndex
                             ? startIndex
                             : currentIndex;
-
-                        // Range ထဲက index တွေကို select လုပ်မယ်
                         for (int i = start; i <= end; i++) {
                           if (i >= 0 && i < _sysControlList.length) {
-                            _selectedIndices.add(i);
+                            // Use reversed index logic for selection as well if needed
+                            // However, since we are dragging over the visual list:
+                            _selectedIndices.add(
+                              _sysControlList.length - 1 - i,
+                            );
                           }
                         }
-                        _updateUpperRangeField(); // အပေါ်က Field ကိုပါ auto update လုပ်မယ်
+                        _updateUpperRangeField();
                       });
                     },
-                    child: ListView.builder(
-                      itemCount: _sysControlList.length,
-                      itemBuilder: (context, index) {
-                        bool isSelected = _selectedIndices.contains(index);
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: ListView.builder(
+                        padding: const EdgeInsets.only(top: 12, bottom: 20),
+                        itemCount: _sysControlList.length,
+                        itemBuilder: (context, index) {
+                          final reversedIndex =
+                              _sysControlList.length - 1 - index;
+                          final item = _sysControlList[reversedIndex];
+                          bool isSelected = _selectedIndices.contains(
+                            reversedIndex,
+                          );
 
-                        return InkWell(
-                          onTap: () => _handleTap(index),
-                          child: Container(
-                            color: isSelected
-                                ? Colors.blue
-                                : Colors
-                                      .transparent, // Select ဖြစ်ရင် အရောင်ပြောင်းမယ်
-                            child: ListTile(
-                              title: Text(
-                                "Date: ${DateFormat('dd/MM/yyyy').format(DateTime.parse(_sysControlList[index]['Sdate'].toString()))}",
-                                style: isSelected
-                                    ? const TextStyle(color: Colors.white)
-                                    : const TextStyle(color: Colors.black),
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: InkWell(
+                              onTap: () => _handleTap(reversedIndex),
+                              borderRadius: BorderRadius.circular(
+                                StyleConstants.borderRadius,
                               ),
-                              subtitle: Text(
-                                "Time: ${DateFormat('HH:mm:ss').format(DateTime.parse(_sysControlList[index]['Sdate'].toString()))}",
-                                style: isSelected
-                                    ? const TextStyle(color: Colors.white)
-                                    : const TextStyle(color: Colors.black),
+                              child: GlassContainer(
+                                padding: const EdgeInsets.all(12),
+                                opacity: isSelected
+                                    ? 0.3
+                                    : (isDark ? 0.1 : 0.05),
+                                borderRadius: StyleConstants.borderRadius,
+                                child: Row(
+                                  children: [
+                                    // Icon based on Option
+                                    Container(
+                                      width: 40,
+                                      height: 40,
+                                      decoration: BoxDecoration(
+                                        color:
+                                            (isSelected
+                                                    ? Colors.blue
+                                                    : Colors.teal)
+                                                .withOpacity(0.2),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Icon(
+                                        item['soption'] == '1'
+                                            ? Icons.settings
+                                            : Icons.info_outline,
+                                        size: 20,
+                                        color: isSelected
+                                            ? Colors.blueAccent
+                                            : Colors.teal,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Text(
+                                                DateFormat(
+                                                  'dd MMM yyyy',
+                                                ).format(
+                                                  _parseServerDateTime(
+                                                    item['Sdate'].toString(),
+                                                  ),
+                                                ),
+                                                style: TextStyle(
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: isSelected
+                                                      ? (isDark
+                                                            ? Colors.blueAccent
+                                                            : Colors.blue)
+                                                      : (isDark
+                                                            ? Colors.white
+                                                            : Colors.black87),
+                                                ),
+                                              ),
+                                              Text(
+                                                item['soption'].toString(),
+                                                style: TextStyle(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.w900,
+                                                  color: Colors.grey
+                                                      .withOpacity(0.5),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Row(
+                                            children: [
+                                              Icon(
+                                                Icons.access_time,
+                                                size: 12,
+                                                color: isDark
+                                                    ? Colors.white38
+                                                    : Colors.black38,
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                DateFormat('HH:mm:ss').format(
+                                                  _parseServerDateTime(
+                                                    item['Sdate'].toString(),
+                                                  ),
+                                                ),
+                                                style: TextStyle(
+                                                  fontSize: 14,
+                                                  letterSpacing: 0.5,
+                                                  color: isDark
+                                                      ? Colors.white60
+                                                      : Colors.black54,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    if (isSelected)
+                                      const Icon(
+                                        Icons.check_circle,
+                                        color: Colors.blueAccent,
+                                        size: 20,
+                                      ),
+                                  ],
+                                ),
                               ),
                             ),
-                          ),
-                        );
-                      },
+                          );
+                        },
+                      ),
                     ),
                   ),
-          ),
-
-          Row(
-            children: [
-              // Start Date & Time
-              Expanded(
-                child: TextField(
-                  controller: _startDateController,
-                  decoration: InputDecoration(labelText: "Start Date"),
-                ),
-              ),
-              Expanded(
-                child: TextField(
-                  controller: _startTimeController,
-                  decoration: InputDecoration(labelText: "Start Time"),
-                ),
-              ),
-
-              const Icon(Icons.arrow_forward), // မြားလေးနဲ့ ပြရင် ပိုမိုက်တယ်
-              // End Date & Time
-              Expanded(
-                child: TextField(
-                  controller: _endDateController,
-                  decoration: InputDecoration(labelText: "End Date"),
-                ),
-              ),
-              Expanded(
-                child: TextField(
-                  controller: _endTimeController,
-                  decoration: InputDecoration(labelText: "End Time"),
-                ),
-              ),
-            ],
           ),
         ],
       ),
@@ -1147,15 +1849,33 @@ class _ReportsScreen extends State<ReportsScreen> {
     );
 
     if (newRange != null) {
+      // Start ကို 00:00:00 နှင့် End ကို 23:59:59 ဟု သတ်မှတ်မည်
+      final start = DateTime(
+        newRange.start.year,
+        newRange.start.month,
+        newRange.start.day,
+        0,
+        0,
+        0,
+      );
+      final end = DateTime(
+        newRange.end.year,
+        newRange.end.month,
+        newRange.end.day,
+        23,
+        59,
+        59,
+      );
+      final adjustedRange = DateTimeRange(start: start, end: end);
+
       setState(() {
-        _selectedDateRange = newRange;
+        _selectedDateRange = adjustedRange;
       });
       // Data ကို ချက်ချင်း ပြန်ခေါ်မယ်
-      _fetchSysControlByRange(newRange.start, newRange.end);
+      _fetchSysControlByRange(adjustedRange.start, adjustedRange.end);
     }
   }
 
-  // Date Search Row
   Widget _buildDateSearchRow(bool isMobile, List<dynamic> data) {
     if (isMobile) {
       return _buildMobileSelectionView(data);
@@ -1163,20 +1883,179 @@ class _ReportsScreen extends State<ReportsScreen> {
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      padding: const EdgeInsets.all(12),
-      color: isDark ? Colors.blueGrey.shade900 : Colors.blueGrey.shade50,
-      child: Wrap(
-        alignment: WrapAlignment.spaceBetween,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        spacing: 16,
-        runSpacing: 16,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+      decoration: BoxDecoration(
+        color: isDark ? StyleConstants.darkBg : Colors.white,
+        border: Border(
+          bottom: BorderSide(
+            color: (isDark ? Colors.white : Colors.black).withOpacity(0.05),
+          ),
+        ),
+      ),
+      child: Column(
         children: [
-          _buildMobileDatePickers(isMobile),
-          _buildSearchButtons(isMobile),
-          _buildReportButtons(isMobile),
-          _buildRecordSummary(data, isMobile),
+          GlassContainer(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                // 1. Station Selector
+                Expanded(
+                  flex: 2,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        "SELECT STATION",
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.teal,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      _buildStationSelector(false),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 24),
+                // 2. Start Date & Time
+                Expanded(
+                  flex: 3,
+                  child: _buildDateTimeSegment(
+                    title: "START DATE & TIME",
+                    dateController: _startDateController,
+                    timeController: _startTimeController,
+                    icon: Icons.play_arrow_rounded,
+                    color: Colors.green,
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Icon(
+                    Icons.arrow_forward_rounded,
+                    color: Colors.grey.withOpacity(0.5),
+                  ),
+                ),
+                // 3. End Date & Time
+                Expanded(
+                  flex: 3,
+                  child: _buildDateTimeSegment(
+                    title: "END DATE & TIME",
+                    dateController: _endDateController,
+                    timeController: _endTimeController,
+                    icon: Icons.stop_rounded,
+                    color: Colors.redAccent,
+                  ),
+                ),
+                const SizedBox(width: 24),
+                // 4. Action Buttons
+                _buildDesktopActions(isMobile),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(child: _buildRecordSummary(_filteredSalesData, false)),
+              if (_searchVoucher.isNotEmpty ||
+                  _searchVehicle.isNotEmpty ||
+                  _filterFuelType != "ALL" ||
+                  _filterSaleType != "ALL")
+                Padding(
+                  padding: const EdgeInsets.only(left: 12),
+                  child: TextButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        _searchVoucher = "";
+                        _searchVehicle = "";
+                        _filterFuelType = "ALL";
+                        _filterSaleType = "ALL";
+                      });
+                    },
+                    icon: const Icon(Icons.clear_all, size: 18),
+                    label: const Text("CLEAR FILTERS"),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.redAccent,
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ],
       ),
+    );
+  }
+
+  Widget _buildDesktopActions(bool isMobile) {
+    return Row(
+      children: [
+        Column(
+          children: [
+            ElevatedButton.icon(
+              onPressed: () async {
+                final start = _combineDateAndTime(
+                  _selectedDateRange!.start,
+                  _startTimeController.text,
+                );
+                final end = _combineDateAndTime(
+                  _selectedDateRange!.end,
+                  _endTimeController.text,
+                );
+                await _searchSalesByDate(start, end);
+              },
+              icon: const Icon(Icons.search_rounded),
+              label: const Text("SEARCH"),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.teal,
+                foregroundColor: Colors.white,
+                minimumSize: const Size(140, 45),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextButton.icon(
+              onPressed: _fetchLatestSales,
+              icon: const Icon(Icons.history_rounded, size: 18),
+              label: const Text("LATEST 20"),
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.teal,
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(width: 12),
+        Column(
+          children: [
+            OutlinedButton.icon(
+              onPressed: () => _exportDetail(),
+              icon: const Icon(Icons.description_outlined, size: 18),
+              label: const Text("DETAIL"),
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size(120, 40),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: () => _exportSummary(),
+              icon: const Icon(Icons.summarize_outlined, size: 18),
+              label: const Text("SUMMARY"),
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size(120, 40),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -1189,6 +2068,7 @@ class _ReportsScreen extends State<ReportsScreen> {
       ),
       child: Column(
         children: [
+          _buildStationSelector(true),
           GlassContainer(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -1207,7 +2087,11 @@ class _ReportsScreen extends State<ReportsScreen> {
                       Expanded(child: Divider()),
                       Padding(
                         padding: EdgeInsets.symmetric(horizontal: 12),
-                        child: Icon(Icons.arrow_downward, size: 16, color: Colors.grey),
+                        child: Icon(
+                          Icons.arrow_downward,
+                          size: 16,
+                          color: Colors.grey,
+                        ),
                       ),
                       Expanded(child: Divider()),
                     ],
@@ -1229,9 +2113,15 @@ class _ReportsScreen extends State<ReportsScreen> {
               Expanded(
                 child: ElevatedButton.icon(
                   onPressed: () async {
-                    final start = _combineDateAndTime(_selectedDateRange!.start, _startTimeController.text);
-                    final end = _combineDateAndTime(_selectedDateRange!.end, _endTimeController.text);
-                    await _searchSalesByDate(start, end);
+                    final start = _combineDateAndTime(
+                      _selectedDateRange!.start,
+                      _startTimeController.text,
+                    );
+                    final end = _combineDateAndTime(
+                      _selectedDateRange!.end,
+                      _endTimeController.text,
+                    );
+                    await _fetchInitialData(start, end);
                   },
                   icon: const Icon(Icons.search),
                   label: const Text("SEARCH NOW"),
@@ -1239,7 +2129,9 @@ class _ReportsScreen extends State<ReportsScreen> {
                     backgroundColor: Colors.teal,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 15),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                 ),
               ),
@@ -1267,7 +2159,9 @@ class _ReportsScreen extends State<ReportsScreen> {
                   label: const Text("DETAIL"),
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                 ),
               ),
@@ -1279,13 +2173,185 @@ class _ReportsScreen extends State<ReportsScreen> {
                   label: const Text("SUMMARY"),
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                 ),
               ),
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildStationSelector(bool isMobile) {
+    return Container(
+      width: isMobile ? double.infinity : 250,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      margin: isMobile ? const EdgeInsets.only(bottom: 16) : EdgeInsets.zero,
+      decoration: BoxDecoration(
+        color: Theme.of(context).brightness == Brightness.dark
+            ? Colors.white10
+            : Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.withOpacity(0.3)),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: _selectedStationId,
+          isExpanded: true,
+          icon: const Icon(Icons.location_on, color: Colors.teal),
+          items: _stations.map((station) {
+            return DropdownMenuItem<String>(
+              value: station['station_id'],
+              child: Text(
+                station['name'] ?? '',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            );
+          }).toList(),
+          onChanged: (value) {
+            setState(() {
+              _selectedStationId = value;
+            });
+            if (value != null) {
+              final start = _combineDateAndTime(
+                _selectedDateRange!.start,
+                _startTimeController.text,
+              );
+              final end = _combineDateAndTime(
+                _selectedDateRange!.end,
+                _endTimeController.text,
+              );
+              _fetchInitialData(start, end);
+              _fetchSysControlByRange(start, end);
+            }
+          },
+        ),
+      ),
+    );
+  }
+
+  // Station Summary Table
+  Widget _buildStationSummaryTable(bool isMobile) {
+    Map<String, Map<String, dynamic>> stationSummary = {};
+
+    for (var sale in _salesData) {
+      String sId = sale['station_id'] ?? 'Unknown';
+      String sName = sale['station_name'] ?? 'Unknown';
+      double amount = double.tryParse(sale['TotalPrice'].toString()) ?? 0.0;
+      double liters = double.tryParse(sale['SALELITER'].toString()) ?? 0.0;
+
+      if (stationSummary.containsKey(sId)) {
+        stationSummary[sId]!['amount'] =
+            stationSummary[sId]!['amount'] + amount;
+        stationSummary[sId]!['liters'] =
+            stationSummary[sId]!['liters'] + liters;
+      } else {
+        stationSummary[sId] = {
+          'name': sName,
+          'amount': amount,
+          'liters': liters,
+        };
+      }
+    }
+
+    final sortedEntries = stationSummary.entries.toList()
+      ..sort((a, b) => b.value['amount'].compareTo(a.value['amount']));
+
+    return SizedBox(
+      width: isMobile
+          ? double.infinity
+          : MediaQuery.of(context).size.width * 0.5 - 20,
+      child: Card(
+        elevation: 4,
+        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Divider(height: 20),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: DataTable(
+                  headingRowColor: WidgetStateProperty.all(
+                    Colors.green.withOpacity(0.1),
+                  ),
+                  columns: const [
+                    DataColumn(
+                      label: Text(
+                        'Station',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                    DataColumn(
+                      label: Text(
+                        'Total Liter',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                      numeric: true,
+                    ),
+                    DataColumn(
+                      label: Text(
+                        'Total Amount',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                      numeric: true,
+                    ),
+                  ],
+                  rows: sortedEntries.map((entry) {
+                    return DataRow(
+                      cells: [
+                        DataCell(
+                          Text(
+                            '${entry.value['name']} (${entry.key})',
+                            style: const TextStyle(
+                              color: Colors.blueGrey,
+                              fontWeight: FontWeight.w500,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ),
+                        DataCell(
+                          Text(
+                            entry.value['liters'].toStringAsFixed(2),
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                        ),
+                        DataCell(
+                          Text(
+                            NumberFormat('#,###').format(entry.value['amount']),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  }).toList(),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -1298,72 +2364,132 @@ class _ReportsScreen extends State<ReportsScreen> {
     required Color color,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
-            shape: BoxShape.circle,
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark
+            ? Colors.white.withOpacity(0.05)
+            : Colors.black.withOpacity(0.02),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.2)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, color: color, size: 24),
           ),
-          child: Icon(icon, color: color, size: 24),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: color, letterSpacing: 1.2)),
-              const SizedBox(height: 4),
-              Row(
-                children: [
-                  Expanded(
-                    flex: 2,
-                    child: InkWell(
-                      onTap: () => _pickDateForController(dateController, title == "START"),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w900,
+                    color: color,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 3,
+                      child: InkWell(
+                        onTap: () => _pickDateForController(
+                          dateController,
+                          title.contains("START"),
+                        ),
+                        borderRadius: BorderRadius.circular(4),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              "DATE",
+                              style: TextStyle(
+                                fontSize: 8,
+                                color: isDark ? Colors.white54 : Colors.grey,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Text(
+                              dateController.text,
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    Container(
+                      width: 1,
+                      height: 20,
+                      color: (isDark ? Colors.white : Colors.black).withOpacity(
+                        0.1,
+                      ),
+                      margin: const EdgeInsets.symmetric(horizontal: 12),
+                    ),
+                    Expanded(
+                      flex: 2,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text("DATE", style: TextStyle(fontSize: 9, color: Colors.grey)),
-                          Text(dateController.text, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                          Text(
+                            "TIME",
+                            style: TextStyle(
+                              fontSize: 8,
+                              color: isDark ? Colors.white54 : Colors.grey,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          SizedBox(
+                            height: 25,
+                            child: TextField(
+                              controller: timeController,
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.5,
+                              ),
+                              decoration: const InputDecoration(
+                                isDense: true,
+                                border: InputBorder.none,
+                                contentPadding: EdgeInsets.zero,
+                              ),
+                              keyboardType: TextInputType.number,
+                            ),
+                          ),
                         ],
                       ),
                     ),
-                  ),
-                  Container(width: 1, height: 25, color: Colors.grey.withOpacity(0.2), margin: const EdgeInsets.symmetric(horizontal: 12)),
-                  Expanded(
-                    flex: 2,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text("TIME", style: TextStyle(fontSize: 9, color: Colors.grey)),
-                        SizedBox(
-                          height: 25,
-                          child: TextField(
-                            controller: timeController,
-                            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-                            decoration: const InputDecoration(
-                              isDense: true,
-                              border: InputBorder.none,
-                              contentPadding: EdgeInsets.zero,
-                            ),
-                            keyboardType: TextInputType.number,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ],
+                  ],
+                ),
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
-  Future<void> _pickDateForController(TextEditingController controller, bool isStart) async {
-    DateTime initial = isStart ? _selectedDateRange!.start : _selectedDateRange!.end;
+  Future<void> _pickDateForController(
+    TextEditingController controller,
+    bool isStart,
+  ) async {
+    DateTime initial = isStart
+        ? _selectedDateRange!.start
+        : _selectedDateRange!.end;
     DateTime? picked = await showDatePicker(
       context: context,
       initialDate: initial,
@@ -1373,111 +2499,43 @@ class _ReportsScreen extends State<ReportsScreen> {
     if (picked != null) {
       setState(() {
         if (isStart) {
-          _selectedDateRange = DateTimeRange(start: picked, end: _selectedDateRange!.end);
+          _selectedDateRange = DateTimeRange(
+            start: picked,
+            end: _selectedDateRange!.end,
+          );
         } else {
-          _selectedDateRange = DateTimeRange(start: _selectedDateRange!.start, end: picked);
+          _selectedDateRange = DateTimeRange(
+            start: _selectedDateRange!.start,
+            end: picked,
+          );
         }
         controller.text = DateFormat("dd-MM-yyyy").format(picked);
       });
     }
   }
 
-  Widget _buildMobileDatePickers(bool isMobile) {
-    return Column(
-      crossAxisAlignment: isMobile ? CrossAxisAlignment.center : CrossAxisAlignment.start,
-      children: [
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          alignment: WrapAlignment.center,
-          children: [
-            _dateTextField(_startDateController, "From Date"),
-            _timeTextField(_startTimeController, "Start Time"),
-          ],
-        ),
-        const Padding(
-          padding: EdgeInsets.symmetric(vertical: 4),
-          child: Text(" TO ", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
-        ),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          alignment: WrapAlignment.center,
-          children: [
-            _dateTextField(_endDateController, "To Date"),
-            _timeTextField(_endTimeController, "End Time"),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSearchButtons(bool isMobile) {
-    return Column(
-      children: [
-        ElevatedButton.icon(
-          onPressed: () async {
-            final start = _combineDateAndTime(_selectedDateRange!.start, _startTimeController.text);
-            final end = _combineDateAndTime(_selectedDateRange!.end, _endTimeController.text);
-            await _searchSalesByDate(start, end);
-          },
-          icon: const Icon(Icons.search),
-          label: const Text("Search"),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.white,
-            foregroundColor: Colors.teal,
-            minimumSize: const Size(160, 45),
-          ),
-        ),
-        const SizedBox(height: 10),
-        ElevatedButton.icon(
-          onPressed: _fetchLatestSales,
-          icon: const Icon(Icons.receipt_long_rounded),
-          label: const Text("Last 20 Sales"),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.teal,
-            foregroundColor: Colors.white,
-            minimumSize: const Size(160, 45),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildReportButtons(bool isMobile) {
-    return Column(
-      children: [
-        ElevatedButton.icon(
-          onPressed: () => _exportDetail(),
-          icon: const Icon(Icons.description),
-          label: const Text("Detail Report"),
-          style: ElevatedButton.styleFrom(minimumSize: const Size(180, 45)),
-        ),
-        const SizedBox(height: 10),
-        ElevatedButton.icon(
-          onPressed: () => _exportSummary(),
-          icon: const Icon(Icons.summarize),
-          label: const Text("Summary Report"),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.blue,
-            foregroundColor: Colors.white,
-            minimumSize: const Size(180, 45),
-          ),
-        ),
-      ],
-    );
-  }
-
   Future<void> _exportDetail() async {
-    salesStreamController.add(SalesLoadStatus(data: _salesData, progress: 0.0, isLoading: true));
+    if (_selectedStationId == null) {
+      _showStationRequiredSnackBar();
+      return;
+    }
+    salesStreamController.add(
+      SalesLoadStatus(data: _salesData, progress: 0.0, isLoading: true),
+    );
     try {
       await exportSaleDetailReport(List<Map<String, dynamic>>.from(_salesData));
     } finally {
-      salesStreamController.add(SalesLoadStatus(data: _salesData, progress: 1.0, isLoading: false));
+      salesStreamController.add(
+        SalesLoadStatus(data: _salesData, progress: 1.0, isLoading: false),
+      );
     }
   }
 
   void _exportSummary() {
+    if (_selectedStationId == null) {
+      _showStationRequiredSnackBar();
+      return;
+    }
     exportSaleDataReport(
       _salesData.toList(),
       AppConfig.stationName,
@@ -1486,12 +2544,30 @@ class _ReportsScreen extends State<ReportsScreen> {
     );
   }
 
+  void _showStationRequiredSnackBar() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text("ကျေးဇူးပြု၍ Station အရင်ရွေးချယ်ပါ"),
+        backgroundColor: Colors.orange,
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
   Widget _buildRecordSummary(List<dynamic> data, bool isMobile) {
     return Column(
-      crossAxisAlignment: isMobile ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+      crossAxisAlignment: isMobile
+          ? CrossAxisAlignment.center
+          : CrossAxisAlignment.start,
       children: [
-        _infoRow("From", "${DateFormat('dd-MM-yyyy').format(_selectedDateRange!.start)} ${_startTimeController.text}"),
-        _infoRow("To", "${DateFormat('dd-MM-yyyy').format(_selectedDateRange!.end)} ${_endTimeController.text}"),
+        _infoRow(
+          "From",
+          "${DateFormat('dd-MM-yyyy').format(_selectedDateRange!.start)} ${_startTimeController.text}",
+        ),
+        _infoRow(
+          "To",
+          "${DateFormat('dd-MM-yyyy').format(_selectedDateRange!.end)} ${_endTimeController.text}",
+        ),
         _infoRow("Record", "${data.length}"),
       ],
     );
@@ -1503,180 +2579,16 @@ class _ReportsScreen extends State<ReportsScreen> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          SizedBox(width: 50, child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold))),
+          SizedBox(
+            width: 50,
+            child: Text(
+              label,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
           Text(":  $value"),
         ],
       ),
-    );
-  }
-
-
-  // Date Text Field
-  Widget _dateTextField(TextEditingController controller, String label) {
-    return Row(
-      children: [
-        // --- From Date Section ---
-        IconButton(
-          onPressed: () async {
-            DateTime? d = await showDatePicker(
-              context: context,
-              initialDate: _selectedDateRange!.start,
-              firstDate: DateTime(2020),
-              lastDate: DateTime(2030),
-            );
-            if (d != null) {
-              setState(() {
-                _selectedDateRange = DateTimeRange(
-                  start: d,
-                  end: _selectedDateRange!.end,
-                );
-                controller.text = DateFormat("dd-MM-yyyy").format(d);
-              });
-            }
-          },
-          icon: const Icon(Icons.calendar_month),
-          tooltip: "From Date",
-        ),
-        const SizedBox(width: 8),
-        Container(
-          width: 110,
-          child: TextField(
-            controller: controller,
-            decoration: InputDecoration(
-              labelText: label,
-              isDense: true,
-              hintText: "dd-mm-yyyy",
-              border: const OutlineInputBorder(),
-              counterText: "",
-              contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-            ),
-            keyboardType: TextInputType.number,
-            onChanged: (value) {
-              // ၁။ ဂဏန်းမဟုတ်တာ အကုန်ဖယ်ပါ
-              String digits = value.replaceAll(RegExp(r'[^0-9]'), '');
-
-              // ၂။ Default အပိုင်းများ သတ်မှတ်ခြင်း (dd, mm, yyyy)
-              String dd = "01";
-              String mm = "01";
-              String yyyy = "2026";
-
-              // ၃။ ရိုက်လိုက်သည့် ဂဏန်းများကို အစဉ်လိုက် ခွဲထုတ်ခြင်း
-              if (digits.length >= 2) {
-                dd = digits.substring(0, 2);
-              } else if (digits.isNotEmpty) {
-                dd = digits.padLeft(2, '0');
-              }
-
-              if (digits.length >= 4) {
-                mm = digits.substring(2, 4);
-              } else if (digits.length > 2) {
-                mm = digits.substring(2).padLeft(2, '0');
-              }
-
-              if (digits.length >= 8) {
-                yyyy = digits.substring(4, 8);
-              } else if (digits.length > 4) {
-                yyyy = digits.substring(4).padLeft(4, '0');
-              }
-
-              // ၄။ Validation (ရက် ၃၁၊ လ ၁၂ ထက်မကျော်စေရန်)
-              if (int.parse(dd) > 31) dd = "31";
-              if (int.parse(dd) == 0) dd = "01";
-              if (int.parse(mm) > 12) mm = "12";
-              if (int.parse(mm) == 0) mm = "01";
-
-              String formatted = "$dd-$mm-$yyyy";
-
-              // ၅။ Controller ကို Update လုပ်ခြင်း
-              if (value != formatted) {
-                int currentOffset = controller.selection.baseOffset;
-                controller.value = TextEditingValue(
-                  text: formatted,
-                  // Cursor ကို လက်ရှိနေရာမှာပဲ ဆက်ရှိနေစေရန်
-                  selection: TextSelection.collapsed(
-                    offset: currentOffset <= formatted.length
-                        ? currentOffset
-                        : formatted.length,
-                  ),
-                );
-              }
-            },
-          ),
-        ),
-      ],
-    );
-  }
-
-  // Time Text Field
-  Widget _timeTextField(TextEditingController controller, String label) {
-    return Row(
-      children: [
-        const Icon(Icons.access_time, color: Colors.blueGrey),
-        SizedBox(
-          width: 120,
-          child: TextField(
-            controller: controller,
-            decoration: InputDecoration(
-              labelText: label,
-              isDense: true,
-              hintText: "00:00:00",
-              border: const OutlineInputBorder(),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-            ),
-            keyboardType: TextInputType.number,
-            onChanged: (value) {
-              // ၁။ ဂဏန်းမဟုတ်တာ အကုန်ဖယ်ပါ
-              String digits = value.replaceAll(RegExp(r'[^0-9]'), '');
-
-              // ၂။ အကယ်၍ User က အကုန်ဖျက်လိုက်ရင် default ပြန်ပေးပါ (optional)
-              if (digits.isEmpty) return;
-
-              // ၃။ အမြဲတမ်း ဂဏန်း ၆ လုံး (hhmmss) ရှိနေအောင် ပုံသေထားပါမည်
-              // ဤနည်းလမ်းသည် Select လုပ်ပြီး ရိုက်လျှင်လည်း Format မပျက်စေပါ
-              String hh = "00";
-              String mm = "00";
-              String ss = "00";
-
-              if (digits.length >= 2) {
-                hh = digits.substring(0, 2);
-              } else {
-                hh = digits.padLeft(2, '0');
-              }
-
-              if (digits.length >= 4) {
-                mm = digits.substring(2, 4);
-              } else if (digits.length > 2)
-                mm = digits.substring(2).padLeft(2, '0');
-
-              if (digits.length >= 6) {
-                ss = digits.substring(4, 6);
-              } else if (digits.length > 4)
-                ss = digits.substring(4).padLeft(2, '0');
-
-              // ၄။ Validation (နာရီ ၂၄၊ မိနစ် ၆၀ ထက်မကျော်စေရန်)
-              if (int.parse(hh) > 23) hh = "23";
-              if (int.parse(mm) > 59) mm = "59";
-              if (int.parse(ss) > 59) ss = "59";
-
-              String formatted = "$hh:$mm:$ss";
-
-              // ၅။ Controller ကို Update လုပ်ခြင်း
-              if (value != formatted) {
-                int currentOffset = controller.selection.baseOffset;
-                controller.value = TextEditingValue(
-                  text: formatted,
-                  // Cursor position ကို မပျောက်အောင် ထိန်းပေးခြင်း
-                  selection: TextSelection.collapsed(
-                    offset: currentOffset <= formatted.length
-                        ? currentOffset
-                        : formatted.length,
-                  ),
-                );
-              }
-            },
-          ),
-        ),
-      ],
     );
   }
 
@@ -1686,4 +2598,3 @@ class _ReportsScreen extends State<ReportsScreen> {
     return "${p[2]}-${p[1]}-${p[0]}"; // Year-Month-Day
   }
 }
-

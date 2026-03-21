@@ -45,9 +45,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: isDark 
-              ? [StyleConstants.darkBg, const Color(0xFF1E293B)]
-              : [StyleConstants.lightBg, const Color(0xFFE2E8F0)],
+            colors: isDark
+                ? [StyleConstants.darkBg, const Color(0xFF1E293B)]
+                : [StyleConstants.lightBg, const Color(0xFFE2E8F0)],
           ),
         ),
         child: SingleChildScrollView(
@@ -59,9 +59,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   Text(
-                    "${AppConfig.stationName}",
+                    AppConfig.stationId == 'ALL' ? 'ALL STATIONS' : AppConfig.stationName,
                     style: TextStyle(
-                      fontSize: isPageSmall ? 22 : 28, 
+                      fontSize: isPageSmall ? 22 : 28,
                       fontWeight: FontWeight.w900,
                       color: isDark ? Colors.white : StyleConstants.lightText,
                       letterSpacing: 1.2,
@@ -71,7 +71,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   Text(
                     "OVERVIEW",
                     style: TextStyle(
-                      fontSize: isPageSmall ? 20 : 28, 
+                      fontSize: isPageSmall ? 20 : 28,
                       fontWeight: FontWeight.w300,
                       color: isDark ? Colors.white70 : Colors.black45,
                     ),
@@ -84,28 +84,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
               FutureBuilder<List<dynamic>>(
                 future: _statsFuture,
                 builder: (context, asyncSnapshot) {
-                  if (asyncSnapshot.connectionState == ConnectionState.waiting) {
+                  if (asyncSnapshot.connectionState ==
+                      ConnectionState.waiting) {
                     return buildLoadingTile("Loading Statistics...");
                   }
-                  
+
                   final pointsData = asyncSnapshot.data?[1] ?? [];
                   final issuedPointsData = asyncSnapshot.data?[2] ?? [];
-                  
-                  final totalRewards = pointsData.isNotEmpty ? (pointsData[0]['total_points'] ?? 0) : 0;
-                  final pointsIssued = issuedPointsData.isNotEmpty ? (issuedPointsData[0]['total_points'] ?? 0) : 0;
+
+                  final totalRewards = pointsData.isNotEmpty
+                      ? (pointsData[0]['total_points'] ?? 0)
+                      : 0;
+                  final pointsIssued = issuedPointsData.isNotEmpty
+                      ? (issuedPointsData[0]['total_points'] ?? 0)
+                      : 0;
 
                   final availableWidth = screenWidth - (pagePadding * 2);
-                  final cardWidth = isPageSmall 
-                    ? availableWidth 
-                    : (screenWidth < 900 ? (availableWidth - 20) / 2 : 280.0);
-                  
+                  final cardWidth = isPageSmall
+                      ? availableWidth
+                      : (screenWidth < 900 ? (availableWidth - 20) / 2 : 280.0);
+
                   return Wrap(
                     spacing: 20,
                     runSpacing: 20,
                     children: [
                       _buildGlassStatCard(
                         "TOTAL REWARDS",
-                        "${formatter.format(totalRewards)}",
+                        formatter.format(totalRewards),
                         "PTS",
                         Icons.card_giftcard,
                         Colors.orangeAccent,
@@ -114,7 +119,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                       _buildGlassStatCard(
                         "POINTS ISSUED",
-                        "${formatter.format(pointsIssued)}",
+                        formatter.format(pointsIssued),
                         "PTS",
                         Icons.stars,
                         Colors.greenAccent,
@@ -123,7 +128,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                       _buildGlassStatCard(
                         "STATION NAME",
-                        AppConfig.stationName,
+                        AppConfig.stationId == 'ALL' ? 'ALL STATIONS' : AppConfig.stationName,
                         "",
                         Icons.location_city,
                         Colors.blueAccent,
@@ -144,12 +149,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     padding: const EdgeInsets.all(2),
                     child: const SummaryGridWidget(),
                   );
-                  
+
                   final recentListWidget = Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Padding(
-                        padding: const EdgeInsets.only(left: 8.0, bottom: 12, top: 24),
+                        padding: const EdgeInsets.only(
+                          left: 8.0,
+                          bottom: 12,
+                          top: 24,
+                        ),
                         child: Text(
                           "RECENT REDEMPTIONS",
                           style: TextStyle(
@@ -161,7 +170,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ),
                       ),
                       SizedBox(
-                        height: 500, // Fixed height for scrolling list when in column or narrow row
+                        height:
+                            500, // Fixed height for scrolling list when in column or narrow row
                         child: GlassContainer(
                           child: const RedemptionHistoryList(),
                         ),
@@ -170,12 +180,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   );
 
                   if (isPageNarrow) {
-                    return Column(
-                      children: [
-                        chartWidget,
-                        recentListWidget,
-                      ],
-                    );
+                    return Column(children: [chartWidget, recentListWidget]);
                   }
 
                   return Row(
@@ -206,9 +211,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     double width,
   ) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     return SizedBox(
-      width: width, 
+      width: width,
       child: GlassContainer(
         padding: const EdgeInsets.all(24),
         child: Column(
@@ -225,7 +230,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                   child: Icon(icon, color: color, size: 24),
                 ),
-                Icon(Icons.trending_up, color: color.withOpacity(0.3), size: 18),
+                Icon(
+                  Icons.trending_up,
+                  color: color.withOpacity(0.3),
+                  size: 18,
+                ),
               ],
             ),
             const SizedBox(height: 20),
@@ -236,7 +245,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Text(
                   value,
                   style: TextStyle(
-                    fontSize: 28, 
+                    fontSize: 28,
                     fontWeight: FontWeight.bold,
                     color: isDark ? Colors.white : StyleConstants.lightText,
                   ),
@@ -246,7 +255,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   Text(
                     unit,
                     style: TextStyle(
-                      fontSize: 12, 
+                      fontSize: 12,
                       fontWeight: FontWeight.w600,
                       color: isDark ? Colors.white38 : Colors.black38,
                     ),
@@ -258,7 +267,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             Text(
               title,
               style: TextStyle(
-                color: isDark ? Colors.white38 : Colors.black45, 
+                color: isDark ? Colors.white38 : Colors.black45,
                 fontSize: 11,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 1.0,
@@ -272,15 +281,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<Map<String, dynamic>> getSummaryData() async {
     final now = DateTime.now();
-    final todayStart = DateTime(now.year, now.month, now.day).toUtc().toIso8601String();
-    
-    final url = Uri.parse('${AppConfig.apiUrl}/api/summary/data')
-        .replace(queryParameters: {
-          'stationId': AppConfig.stationId,
-          'date': todayStart,
-        });
-        
-    final response = await http.get(url).timeout(const Duration(seconds: 10));
+    final todayStart = DateTime(
+      now.year,
+      now.month,
+      now.day,
+    ).toUtc().toIso8601String();
+
+    if (AppConfig.stationId == 'ALL') {
+      // API aggregation is not yet supported for ALL stations
+      return {'total_amount': 0, 'total_liters': 0, 'total_count': 0};
+    }
+
+    final url = Uri.parse('${AppConfig.apiUrl}/api/summary/data').replace(
+      queryParameters: {'stationId': AppConfig.stationId, 'date': todayStart},
+    );
+
+    final response = await http
+        .get(url, headers: AppConfig.headers)
+        .timeout(const Duration(seconds: 10));
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
       return data;
@@ -291,17 +309,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<List<Map<String, dynamic>>> getPointsSummary() async {
     final now = DateTime.now();
-    final todayStart = DateTime(now.year, now.month, now.day).toUtc().toIso8601String();
+    final todayStart = DateTime(
+      now.year,
+      now.month,
+      now.day,
+    ).toUtc().toIso8601String();
 
     try {
-      final response = await Supabase.instance.client.rpc(
-        'get_points_summary_by_station',
-        params: {
-          'start_date': todayStart,
-          'p_station_id': AppConfig.stationId,
-        },
-      );
-      return List<Map<String, dynamic>>.from(response ?? []);
+      if (AppConfig.stationId == 'ALL') {
+        final response = await Supabase.instance.client
+            .from('fuel_transactions')
+            .select('points_earned')
+            .gte('created_at', todayStart);
+        
+        int total = 0;
+        for (var row in response) {
+          total += (row['points_earned'] as num).toInt();
+        }
+        return [{'station_id': 'ALL', 'total_points': total}];
+      } else {
+        final response = await Supabase.instance.client.rpc(
+          'get_points_summary_by_station',
+          params: {'start_date': todayStart, 'p_station_id': AppConfig.stationId},
+        );
+        return List<Map<String, dynamic>>.from(response ?? []);
+      }
     } catch (e) {
       print('RPC Error: $e');
       return [
@@ -312,17 +344,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<List<Map<String, dynamic>>> getIssuedPointsSummary() async {
     final now = DateTime.now();
-    final todayStart = DateTime(now.year, now.month, now.day).toUtc().toIso8601String();
+    final todayStart = DateTime(
+      now.year,
+      now.month,
+      now.day,
+    ).toUtc().toIso8601String();
 
     try {
-      final response = await Supabase.instance.client.rpc(
-        'get_issued_points_summary_by_station',
-        params: {
-          'start_date': todayStart,
-          'p_station_id': AppConfig.stationId,
-        },
-      );
-      return List<Map<String, dynamic>>.from(response ?? []);
+      if (AppConfig.stationId == 'ALL') {
+        final response = await Supabase.instance.client
+            .from('redemption_history')
+            .select('points_spent')
+            .gte('created_at', todayStart);
+        
+        int total = 0;
+        for (var row in response) {
+          total += (row['points_spent'] as num).toInt();
+        }
+        return [{'station_id': 'ALL', 'total_points': total}];
+      } else {
+        final response = await Supabase.instance.client.rpc(
+          'get_issued_points_summary_by_station',
+          params: {'start_date': todayStart, 'p_station_id': AppConfig.stationId},
+        );
+        return List<Map<String, dynamic>>.from(response ?? []);
+      }
     } catch (e) {
       print('RPC Error: $e');
       return [

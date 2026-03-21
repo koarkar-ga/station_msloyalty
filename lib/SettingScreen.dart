@@ -16,7 +16,7 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   int _selectedIndex = 0;
   bool _useCameraScanner = false;
-  
+
   // Fuel Price Data
   Map<String, dynamic>? _livePrices;
   bool _isPricesLoading = false;
@@ -36,7 +36,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   List<Map<String, dynamic>> _stations = [];
   String? _selectedStationId;
   bool _isLoadingStations = false;
-  
 
   @override
   void initState() {
@@ -49,7 +48,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() {
       _useCameraScanner = settings?.useCameraScanner ?? false;
       _isPricesLoading = true;
-      
+
       // Initialize Server Config Controllers
       _nameController.text = AppConfig.stationName;
       _idController.text = AppConfig.stationId;
@@ -84,20 +83,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _fetchStations() async {
     setState(() => _isLoadingStations = true);
     try {
-      final data = await Supabase.instance.client
+      final response = await Supabase.instance.client
           .from('stations')
           .select('station_id, name')
           .order('name');
-      
+
       if (mounted) {
         setState(() {
-          _stations = List<Map<String, dynamic>>.from(data);
+          _stations = List<Map<String, dynamic>>.from(response);
+          // အကယ်၍ Admin User ဖြစ်လျှင် ALL STATIONS ကို ထည့်ပေးမယ်
+          if (AppConfig.currentUserLevel == 1) {
+            _stations.insert(0, {
+              'station_id': 'ALL',
+              'name': 'ALL STATIONS',
+            });
+          }
           _isLoadingStations = false;
         });
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isLoadingStations = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error fetching stations: $e')),
+        );
       }
     }
   }
@@ -109,7 +118,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           title: const Text("Select Station"),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 8,
+            vertical: 16,
+          ),
           content: SizedBox(
             width: 400,
             child: Column(
@@ -122,31 +134,45 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     decoration: InputDecoration(
                       hintText: "Search by Name or ID...",
                       prefixIcon: const Icon(Icons.search),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
                     ),
-                    onChanged: (v) => setDialogState(() => searchQuery = v.toLowerCase()),
+                    onChanged: (v) =>
+                        setDialogState(() => searchQuery = v.toLowerCase()),
                   ),
                 ),
                 const SizedBox(height: 16),
                 ConstrainedBox(
-                  constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.5),
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.of(context).size.height * 0.5,
+                  ),
                   child: ListView.builder(
                     shrinkWrap: true,
                     itemCount: _stations.where((s) {
                       final name = s['name']?.toString().toLowerCase() ?? "";
-                      final id = s['station_id']?.toString().toLowerCase() ?? "";
-                      return name.contains(searchQuery) || id.contains(searchQuery);
+                      final id =
+                          s['station_id']?.toString().toLowerCase() ?? "";
+                      return name.contains(searchQuery) ||
+                          id.contains(searchQuery);
                     }).length,
                     itemBuilder: (context, index) {
                       final filtered = _stations.where((s) {
                         final name = s['name']?.toString().toLowerCase() ?? "";
-                        final id = s['station_id']?.toString().toLowerCase() ?? "";
-                        return name.contains(searchQuery) || id.contains(searchQuery);
+                        final id =
+                            s['station_id']?.toString().toLowerCase() ?? "";
+                        return name.contains(searchQuery) ||
+                            id.contains(searchQuery);
                       }).toList();
                       final s = filtered[index];
                       return ListTile(
-                        leading: const CircleAvatar(child: Icon(Icons.ev_station, size: 20)),
+                        leading: const CircleAvatar(
+                          child: Icon(Icons.ev_station, size: 20),
+                        ),
                         title: Text(s['name'] ?? ""),
                         subtitle: Text("ID: ${s['station_id']}"),
                         onTap: () {
@@ -264,7 +290,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: isMobile
           ? IndexedStack(
               index: _selectedIndex,
-              children: categories.map<Widget>((cat) => cat['body'] as Widget).toList(),
+              children: categories
+                  .map<Widget>((cat) => cat['body'] as Widget)
+                  .toList(),
             )
           : Row(
               children: [
@@ -288,7 +316,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 Expanded(
                   child: IndexedStack(
                     index: _selectedIndex,
-                    children: categories.map<Widget>((cat) => cat['body'] as Widget).toList(),
+                    children: categories
+                        .map<Widget>((cat) => cat['body'] as Widget)
+                        .toList(),
                   ),
                 ),
               ],
@@ -351,16 +381,37 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
           const SizedBox(height: 20),
-          _isPricesLoading 
-            ? const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()))
-            : Column(
-                children: [
-                  _priceDisplayTile("92 Ron", "${_livePrices?['octane_92'] ?? '---'} MMK", Colors.orange),
-                  _priceDisplayTile("95 Ron", "${_livePrices?['octane_95'] ?? '---'} MMK", Colors.red),
-                  _priceDisplayTile("Diesel", "${_livePrices?['diesel'] ?? '---'} MMK", Colors.green),
-                  _priceDisplayTile("Premium Diesel", "${_livePrices?['premium_diesel'] ?? '---'} MMK", Colors.blue),
-                ],
-              ),
+          _isPricesLoading
+              ? const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(20),
+                    child: CircularProgressIndicator(),
+                  ),
+                )
+              : Column(
+                  children: [
+                    _priceDisplayTile(
+                      "92 Ron",
+                      "${_livePrices?['octane_92'] ?? '---'} MMK",
+                      Colors.orange,
+                    ),
+                    _priceDisplayTile(
+                      "95 Ron",
+                      "${_livePrices?['octane_95'] ?? '---'} MMK",
+                      Colors.red,
+                    ),
+                    _priceDisplayTile(
+                      "Diesel",
+                      "${_livePrices?['diesel'] ?? '---'} MMK",
+                      Colors.green,
+                    ),
+                    _priceDisplayTile(
+                      "Premium Diesel",
+                      "${_livePrices?['premium_diesel'] ?? '---'} MMK",
+                      Colors.blue,
+                    ),
+                  ],
+                ),
           const SizedBox(height: 30),
         ],
       ),
@@ -413,7 +464,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             radius: isMobile ? 40 : 50,
             backgroundColor: Colors.blue.withOpacity(0.1),
             child: Icon(
-              Icons.admin_panel_settings, 
+              Icons.admin_panel_settings,
               size: isMobile ? 40 : 50,
               color: Colors.blue,
             ),
@@ -424,7 +475,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             subtitle: Text(AppConfig.currentUserName ?? "Unknown User"),
           ),
           ListTile(
-            title: const Text("Role Level"), 
+            title: const Text("Role Level"),
             subtitle: Text("Level ${AppConfig.currentUserLevel}"),
           ),
           ListTile(
@@ -477,12 +528,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 30),
 
           if (isAdmin) ...[
-            Text("Configuration Mode", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blueGrey[700])),
+            Text(
+              "Configuration Mode",
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.blueGrey[700],
+              ),
+            ),
             const SizedBox(height: 12),
             SegmentedButton<String>(
               segments: const [
-                ButtonSegment(value: 'HO', label: Text('HO Config'), icon: Icon(Icons.business)),
-                ButtonSegment(value: 'Station', label: Text('Station Config'), icon: Icon(Icons.settings_input_component)),
+                ButtonSegment(
+                  value: 'HO',
+                  label: Text('HO Config'),
+                  icon: Icon(Icons.business),
+                ),
+                ButtonSegment(
+                  value: 'Station',
+                  label: Text('Station Config'),
+                  icon: Icon(Icons.settings_input_component),
+                ),
               ],
               selected: {_configMode},
               onSelectionChanged: (Set<String> newSelection) {
@@ -494,12 +559,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const SizedBox(height: 24),
 
             if (_configMode == 'HO') ...[
-              Text("Target Station", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blueGrey[700])),
+              Text(
+                "Target Station",
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blueGrey[700],
+                ),
+              ),
               const SizedBox(height: 12),
               InkWell(
                 onTap: _showStationSearchDialog,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                   decoration: BoxDecoration(
                     border: Border.all(color: Colors.grey[300]!),
                     borderRadius: BorderRadius.circular(8),
@@ -511,11 +585,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          _selectedStationId == null 
-                            ? "Tap to search & select station..." 
-                            : "${_nameController.text} (${_selectedStationId})",
+                          _selectedStationId == null
+                              ? "Tap to search & select station..."
+                              : "${_nameController.text} ($_selectedStationId)",
                           style: TextStyle(
-                            color: _selectedStationId == null ? Colors.grey : Colors.black87,
+                            color: _selectedStationId == null
+                                ? Colors.grey
+                                : Colors.black87,
                             fontSize: 15,
                           ),
                         ),
@@ -534,26 +610,67 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ],
           ],
 
-          Text("Station Details", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blueGrey[700])),
+          Text(
+            "Station Details",
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Colors.blueGrey[700],
+            ),
+          ),
           const Divider(),
-          _buildSettingField(_nameController, "Station Name", Icons.store, readOnly: _configMode == 'HO'),
-          _buildSettingField(_idController, "Station ID", Icons.badge, readOnly: _configMode == 'HO'),
-          
+          _buildSettingField(
+            _nameController,
+            "Station Name",
+            Icons.store,
+            readOnly: _configMode == 'HO',
+          ),
+          _buildSettingField(
+            _idController,
+            "Station ID",
+            Icons.badge,
+            readOnly: _configMode == 'HO',
+          ),
+
           if (_configMode != 'HO') ...[
             const SizedBox(height: 24),
-            Text("Database Settings", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blueGrey[700])),
+            Text(
+              "Database Settings",
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.blueGrey[700],
+              ),
+            ),
             const Divider(),
-            _buildSettingField(_hostController, "Server Host", Icons.cloud_queue),
+            _buildSettingField(
+              _hostController,
+              "Server Host",
+              Icons.cloud_queue,
+            ),
             _buildSettingField(_dbController, "Database Name", Icons.storage),
-            _buildSettingField(_userController, "Username", Icons.person_outline),
-            _buildSettingField(_passController, "Password", Icons.lock_outline, isPassword: true),
-            
+            _buildSettingField(
+              _userController,
+              "Username",
+              Icons.person_outline,
+            ),
+            _buildSettingField(
+              _passController,
+              "Password",
+              Icons.lock_outline,
+              isPassword: true,
+            ),
+
             const SizedBox(height: 24),
-            Text("API Connection", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blueGrey[700])),
+            Text(
+              "API Connection",
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.blueGrey[700],
+              ),
+            ),
             const Divider(),
             _buildSettingField(_apiController, "Local API URL", Icons.link),
           ],
-          
+
           const SizedBox(height: 40),
           SizedBox(
             width: double.infinity,
@@ -563,11 +680,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 backgroundColor: Colors.blueGrey,
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
-              child: _isSavingConfig 
-                ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : const Text("Apply & Save Configuration"),
+              child: _isSavingConfig
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Text("Apply & Save Configuration"),
             ),
           ),
           const SizedBox(height: 40),
@@ -587,7 +713,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final station = _stations.firstWhere((s) => s['station_id'] == stationId);
       _nameController.text = station['name'] ?? '';
       _idController.text = station['station_id'] ?? '';
-      _dbController.text = station['station_id'] ?? ''; // DB Name becomes Station ID
+      _dbController.text =
+          station['station_id'] ?? ''; // DB Name becomes Station ID
 
       // 2. Fetch connection details from the auth table for 'ALL' stations
       // This is the central HO server config we set up in the previous step.
@@ -603,6 +730,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _passController.text = hoConfig['db_pass'] ?? _passController.text;
         _apiController.text = hoConfig['api_url'] ?? _apiController.text;
       }
+
+      // Sync Station ID to pos-api config.ini if in HO mode
+      if (_configMode == 'HO') {
+        await AppConfig.updatePosApiConfig(stationId);
+      }
     } catch (e) {
       debugPrint("Error auto-fetching station config: $e");
     } finally {
@@ -610,7 +742,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  Widget _buildSettingField(TextEditingController controller, String label, IconData icon, {bool isPassword = false, bool readOnly = false}) {
+  Widget _buildSettingField(
+    TextEditingController controller,
+    String label,
+    IconData icon, {
+    bool isPassword = false,
+    bool readOnly = false,
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: TextField(
@@ -641,16 +779,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
         dbName: _dbController.text,
         api: _apiController.text,
       );
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Server configuration updated successfully!")),
+          const SnackBar(
+            content: Text("Server configuration updated successfully!"),
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Failed to update config: $e"), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text("Failed to update config: $e"),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     } finally {

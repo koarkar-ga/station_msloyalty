@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:station_msloyalty/AppConfig.dart';
@@ -7,7 +6,6 @@ import 'package:station_msloyalty/Services/AuthService.dart';
 import 'package:station_msloyalty/Services/ActivityService.dart';
 import 'package:station_msloyalty/app_launcher_screen.dart';
 import 'package:station_msloyalty/Constants/StyleConstants.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -35,22 +33,38 @@ class _LoginPageState extends State<LoginPage> {
 
       if (data!['status'] == 'success') {
         final userStationCode = data['station_code'] as String?;
-        bool canLogin = userStationCode == null || userStationCode == 'ALL' || userStationCode == AppConfig.stationId;
+        bool canLogin =
+            userStationCode == null ||
+            userStationCode == 'ALL' ||
+            userStationCode == AppConfig.stationId;
         if (!canLogin) {
           setState(() => _isLoading = false);
-          _showError('Access Denied', 'သင်သည် ဤဆိုင် (${AppConfig.stationId}) တွင် Login ဝင်ရန် ခွင့်ပြုချက်မရှိပါ။');
+          _showError(
+            'Access Denied',
+            'သင်သည် ဤဆိုင် (${AppConfig.stationId}) တွင် Login ဝင်ရန် ခွင့်ပြုချက်မရှိပါ။',
+          );
           return;
         }
-        AppConfig.currentUserLevel = data['userlevel'] ?? 11;
+                AppConfig.currentUserLevel = data['userlevel'] ?? 11;
         AppConfig.currentUserId = data['id'];
-        AppConfig.currentUserName = data['fullname'] ?? _usernameController.text.trim();
+        AppConfig.currentUserName =
+            data['fullname'] ?? _usernameController.text.trim();
         
+        // Store permissions
+        if (data['permissions'] != null) {
+          final perms = data['permissions'] as Map<String, dynamic>;
+          AppConfig.permissions = perms.map((key, value) => MapEntry(key, value == true));
+        } else {
+          AppConfig.permissions = {};
+        }
+
         // Log Login Activity
         await ActivityService.logActivity(
           actionType: 'login',
-          description: 'User ${AppConfig.currentUserName} logged in at ${AppConfig.stationName}',
+          description:
+              'User ${AppConfig.currentUserName} logged in at ${AppConfig.stationName}',
         );
-        
+
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (context) => const AppLauncherScreen()),
           (route) => false,
@@ -73,7 +87,10 @@ class _LoginPageState extends State<LoginPage> {
         title: Text(title, style: const TextStyle(color: Colors.white)),
         content: Text(message, style: const TextStyle(color: Colors.white70)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK', style: TextStyle(color: Colors.blueAccent))),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK', style: TextStyle(color: Colors.blueAccent)),
+          ),
         ],
       ),
     );
@@ -91,9 +108,9 @@ class _LoginPageState extends State<LoginPage> {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: isDark 
-              ? [const Color(0xFF0F172A), const Color(0xFF1E293B)]
-              : [const Color(0xFFF1F5F9), const Color(0xFFE2E8F0)],
+            colors: isDark
+                ? [const Color(0xFF0F172A), const Color(0xFF1E293B)]
+                : [const Color(0xFFF1F5F9), const Color(0xFFE2E8F0)],
           ),
         ),
         child: Stack(
@@ -101,7 +118,9 @@ class _LoginPageState extends State<LoginPage> {
             // Subtle patterns or background images can be added here
             Center(
               child: SingleChildScrollView(
-                padding: EdgeInsets.symmetric(horizontal: MediaQuery.of(context).size.width < 600 ? 16 : 24),
+                padding: EdgeInsets.symmetric(
+                  horizontal: MediaQuery.of(context).size.width < 600 ? 16 : 24,
+                ),
                 child: LayoutBuilder(
                   builder: (context, constraints) {
                     final isSmall = MediaQuery.of(context).size.width < 600;
@@ -116,7 +135,11 @@ class _LoginPageState extends State<LoginPage> {
                           children: [
                             Hero(
                               tag: 'logo',
-                              child: Image.asset('assets/images/moonsun_logo.png', width: isSmall ? 80 : 100, height: isSmall ? 80 : 100),
+                              child: Image.asset(
+                                'assets/images/moonsun_logo.png',
+                                width: isSmall ? 80 : 100,
+                                height: isSmall ? 80 : 100,
+                              ),
                             ),
                             SizedBox(height: isSmall ? 24 : 32),
                             Text(
@@ -135,7 +158,9 @@ class _LoginPageState extends State<LoginPage> {
                               style: GoogleFonts.outfit(
                                 fontSize: isSmall ? 24 : 32,
                                 fontWeight: FontWeight.bold,
-                                color: isDark ? Colors.white : StyleConstants.lightText,
+                                color: isDark
+                                    ? Colors.white
+                                    : StyleConstants.lightText,
                               ),
                             ),
                             SizedBox(height: isSmall ? 32 : 48),
@@ -145,7 +170,8 @@ class _LoginPageState extends State<LoginPage> {
                               label: "Username",
                               icon: Icons.person_outline_rounded,
                               isDark: isDark,
-                              validator: (v) => v!.isEmpty ? "Enter username" : null,
+                              validator: (v) =>
+                                  v!.isEmpty ? "Enter username" : null,
                             ),
                             const SizedBox(height: 24),
 
@@ -156,8 +182,11 @@ class _LoginPageState extends State<LoginPage> {
                               isPassword: true,
                               isPasswordVisible: _isPasswordVisible,
                               isDark: isDark,
-                              onTogglePassword: () => setState(() => _isPasswordVisible = !_isPasswordVisible),
-                              validator: (v) => v!.isEmpty ? "Enter password" : null,
+                              onTogglePassword: () => setState(
+                                () => _isPasswordVisible = !_isPasswordVisible,
+                              ),
+                              validator: (v) =>
+                                  v!.isEmpty ? "Enter password" : null,
                               onFieldSubmitted: (v) => _handleLogin(),
                             ),
                             SizedBox(height: isSmall ? 32 : 48),
@@ -168,16 +197,32 @@ class _LoginPageState extends State<LoginPage> {
                               child: ElevatedButton(
                                 onPressed: _isLoading ? null : _handleLogin,
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: isDark ? StyleConstants.darkAccent : StyleConstants.lightAccent,
-                                  foregroundColor: isDark ? Colors.black : Colors.white,
+                                  backgroundColor: isDark
+                                      ? StyleConstants.darkAccent
+                                      : StyleConstants.lightAccent,
+                                  foregroundColor: isDark
+                                      ? Colors.black
+                                      : Colors.white,
                                   elevation: 0,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
                                 ),
                                 child: _isLoading
-                                    ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
+                                    ? const SizedBox(
+                                        width: 24,
+                                        height: 24,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
                                     : Text(
                                         "AUTHORIZE & SIGN IN",
-                                        style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 1.2),
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 1.2,
+                                        ),
                                       ),
                               ),
                             ),
@@ -185,7 +230,7 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                       ),
                     );
-                  }
+                  },
                 ),
               ),
             ),
@@ -209,26 +254,50 @@ class _LoginPageState extends State<LoginPage> {
     return TextFormField(
       controller: controller,
       obscureText: isPassword && !isPasswordVisible,
-      style: GoogleFonts.outfit(color: isDark ? Colors.white : Colors.black87, fontSize: 16),
+      style: GoogleFonts.outfit(
+        color: isDark ? Colors.white : Colors.black87,
+        fontSize: 16,
+      ),
       onFieldSubmitted: onFieldSubmitted,
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: GoogleFonts.outfit(color: isDark ? Colors.white38 : Colors.black38),
-        prefixIcon: Icon(icon, color: isDark ? Colors.white38 : Colors.black38, size: 22),
+        labelStyle: GoogleFonts.outfit(
+          color: isDark ? Colors.white38 : Colors.black38,
+        ),
+        prefixIcon: Icon(
+          icon,
+          color: isDark ? Colors.white38 : Colors.black38,
+          size: 22,
+        ),
         suffixIcon: isPassword
             ? IconButton(
-                icon: Icon(isPasswordVisible ? Icons.visibility : Icons.visibility_off, color: isDark ? Colors.white38 : Colors.black38, size: 20),
+                icon: Icon(
+                  isPasswordVisible ? Icons.visibility : Icons.visibility_off,
+                  color: isDark ? Colors.white38 : Colors.black38,
+                  size: 20,
+                ),
                 onPressed: onTogglePassword,
               )
             : null,
         filled: true,
         fillColor: (isDark ? Colors.white : Colors.black).withOpacity(0.05),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide.none,
+        ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: isDark ? StyleConstants.darkAccent : StyleConstants.lightAccent, width: 2),
+          borderSide: BorderSide(
+            color: isDark
+                ? StyleConstants.darkAccent
+                : StyleConstants.lightAccent,
+            width: 2,
+          ),
         ),
-        errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Colors.redAccent, width: 1)),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: Colors.redAccent, width: 1),
+        ),
       ),
       validator: validator,
     );

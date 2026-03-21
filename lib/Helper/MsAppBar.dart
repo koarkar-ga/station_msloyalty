@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
@@ -16,7 +15,7 @@ class MsAppBar extends StatefulWidget implements PreferredSizeWidget {
   final bool showBackButton;
 
   const MsAppBar({
-    super.key, 
+    super.key,
     this.title = 'Dashboard',
     this.actions,
     this.bottom,
@@ -24,7 +23,8 @@ class MsAppBar extends StatefulWidget implements PreferredSizeWidget {
   });
 
   @override
-  Size get preferredSize => Size.fromHeight(kToolbarHeight + (bottom?.preferredSize.height ?? 0));
+  Size get preferredSize =>
+      Size.fromHeight(kToolbarHeight + (bottom?.preferredSize.height ?? 0));
 
   @override
   State<MsAppBar> createState() => _MsAppBarState();
@@ -57,7 +57,9 @@ class _MsAppBarState extends State<MsAppBar> {
 
   Future<bool> checkApiConnection() async {
     try {
-      final response = await http.get(Uri.parse(AppConfig.apiHealthUrl)).timeout(const Duration(seconds: 3));
+      final response = await http
+          .get(Uri.parse(AppConfig.apiHealthUrl))
+          .timeout(const Duration(seconds: 3));
       if (response.statusCode == 200) {
         if (mounted) setState(() => _isApiOnline = true);
       }
@@ -69,7 +71,9 @@ class _MsAppBarState extends State<MsAppBar> {
 
   Future<void> _ehoRemainingToSend() async {
     try {
-      final response = await http.get(Uri.parse(apiEhoSendCount)).timeout(const Duration(seconds: 15));
+      final response = await http
+          .get(Uri.parse(apiEhoSendCount))
+          .timeout(const Duration(seconds: 15));
       final data = json.decode(response.body);
       if (response.statusCode == 200 && mounted) {
         setState(() {
@@ -78,7 +82,12 @@ class _MsAppBarState extends State<MsAppBar> {
         });
       }
     } catch (e) {
-      if (mounted) setState(() { _ehoRemainingToSendCount = 0; _isEhoUpdate = false; });
+      if (mounted) {
+        setState(() {
+          _ehoRemainingToSendCount = 0;
+          _isEhoUpdate = false;
+        });
+      }
     }
   }
 
@@ -93,16 +102,29 @@ class _MsAppBarState extends State<MsAppBar> {
 
     return AppBar(
       automaticallyImplyLeading: widget.showBackButton,
-      leading: widget.showBackButton ? IconButton(
-        icon: Icon(Icons.arrow_back_ios_new, color: isDark ? Colors.white : StyleConstants.lightText),
-        onPressed: () => Navigator.maybePop(context),
-      ) : null,
+      leading: widget.showBackButton
+          ? IconButton(
+              icon: Icon(
+                Icons.arrow_back_ios_new,
+                color: isDark ? Colors.white : StyleConstants.lightText,
+              ),
+              onPressed: () => Navigator.maybePop(context),
+            )
+          : null,
       elevation: 0,
       backgroundColor: Colors.transparent,
       flexibleSpace: Container(
         decoration: BoxDecoration(
-          color: (isDark ? StyleConstants.darkSurface : StyleConstants.lightSurface).withOpacity(0.95),
-          border: Border(bottom: BorderSide(color: (isDark ? Colors.white : Colors.black).withOpacity(0.1))),
+          color:
+              (isDark
+                      ? StyleConstants.darkSurface
+                      : StyleConstants.lightSurface)
+                  .withOpacity(0.95),
+          border: Border(
+            bottom: BorderSide(
+              color: (isDark ? Colors.white : Colors.black).withOpacity(0.1),
+            ),
+          ),
         ),
       ),
       title: Row(
@@ -128,11 +150,18 @@ class _MsAppBarState extends State<MsAppBar> {
           children: [
             _buildStatusIndicator(isVeryCompact),
             if (!isVeryCompact)
-              const VerticalDivider(width: 1, indent: 15, endIndent: 15, color: Colors.white24),
-            
+              const VerticalDivider(
+                width: 1,
+                indent: 15,
+                endIndent: 15,
+                color: Colors.white24,
+              ),
+
             IconButton(
-              icon: Icon(isDark ? Icons.light_mode : Icons.dark_mode, 
-                color: isDark ? Colors.amber : StyleConstants.lightAccent),
+              icon: Icon(
+                isDark ? Icons.light_mode : Icons.dark_mode,
+                color: isDark ? Colors.amber : StyleConstants.lightAccent,
+              ),
               onPressed: () => themeProvider.toggleTheme(),
               tooltip: isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode',
             ),
@@ -158,7 +187,10 @@ class _MsAppBarState extends State<MsAppBar> {
 
   Widget _buildDateTime() {
     return StreamBuilder<DateTime>(
-      stream: Stream.periodic(const Duration(seconds: 1), (_) => DateTime.now()),
+      stream: Stream.periodic(
+        const Duration(seconds: 1),
+        (_) => DateTime.now(),
+      ),
       builder: (context, snapshot) {
         final now = snapshot.data ?? DateTime.now();
         final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -168,11 +200,18 @@ class _MsAppBarState extends State<MsAppBar> {
           children: [
             Text(
               DateFormat('dd-MM-yyyy').format(now),
-              style: TextStyle(fontSize: 11, color: isDark ? Colors.white70 : Colors.black54),
+              style: TextStyle(
+                fontSize: 11,
+                color: isDark ? Colors.white70 : Colors.black54,
+              ),
             ),
             Text(
               DateFormat('hh:mm aa').format(now),
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black),
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : Colors.black,
+              ),
             ),
           ],
         );

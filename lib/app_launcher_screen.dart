@@ -69,119 +69,96 @@ class AppLauncherScreen extends StatelessWidget {
                 crossAxisSpacing: spacing,
                 mainAxisSpacing: spacing,
                 children: [
-                  _buildMenuButton(
-                    context,
-                    icon: Icons.dashboard_rounded,
-                    label: "Dashboard",
-                    color: Colors.blue,
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute(builder: (context) => DashboardScreen()),
+                  if (AppConfig.permissions['Dashboard'] == true || AppConfig.currentUserLevel == 1)
+                    _buildMenuButton(
+                      context,
+                      icon: Icons.dashboard_rounded,
+                      label: "Dashboard",
+                      color: Colors.blue,
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(builder: (context) => DashboardScreen()),
+                        );
+                      },
                     ),
-                  ),
-                  _buildMenuButton(
-                    context,
-                    icon: Icons.add_chart_rounded, // Point စုတဲ့ Icon
-                    label: "Collect Point",
-                    color: Colors.purple,
-                    onTap: () {
-                      // Collect Point Screen ဆီသွားမည့် Logic
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const CollectPointScreen(),
-                        ),
-                      );
-                    },
-                  ),
-
-                  _buildMenuButton(
-                    context,
-                    icon: Icons.card_giftcard_rounded, // Reward/Gift Icon
-                    label: "Reward Point",
-                    color: Colors.pink,
-                    onTap: () {
-                      // Reward Point Screen ဆီသွားမည့် Logic
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => RewardPointScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                  _buildMenuButton(
-                    context,
-                    icon: Icons.assessment,
-                    label: "Reports",
-                    color: Colors.orange,
-                    onTap: () {
-                      if (AppConfig.currentUserLevel == 1) {
+                  if (AppConfig.permissions['Collect Point'] == true || AppConfig.currentUserLevel == 1)
+                    _buildMenuButton(
+                      context,
+                      icon: Icons.add_chart_rounded,
+                      label: "Collect Point",
+                      color: Colors.purple,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const CollectPointScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                  if (AppConfig.permissions['Reward Point'] == true || AppConfig.currentUserLevel == 1)
+                    _buildMenuButton(
+                      context,
+                      icon: Icons.card_giftcard_rounded,
+                      label: "Reward Point",
+                      color: Colors.pink,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => RewardPointScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                  if (AppConfig.permissions['Reports'] == true || AppConfig.currentUserLevel == 1)
+                    _buildMenuButton(
+                      context,
+                      icon: Icons.assessment,
+                      label: "Reports",
+                      color: Colors.orange,
+                      onTap: () {
                         Navigator.of(context).push(
                           MaterialPageRoute(
                             builder: (context) => const ReportsScreen(),
                           ),
                         );
-                      } else {
-                        _showNoPermissionDialog(context);
-                      }
-                    },
-                  ),
-                  _buildMenuButton(
-                    context,
-                    icon: Icons.pie_chart_rounded, // Loyalty Reports Icon
-                    label: "Loyalty Reports",
-                    color: Colors.teal,
-                    onTap: () {
-                      if (AppConfig.currentUserLevel == 1) {
+                      },
+                    ),
+                  if (AppConfig.permissions['Loyalty Reports'] == true || AppConfig.currentUserLevel == 1)
+                    _buildMenuButton(
+                      context,
+                      icon: Icons.pie_chart_rounded,
+                      label: "Loyalty Reports",
+                      color: Colors.teal,
+                      onTap: () {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
                             builder: (context) => const LoyaltyReportScreen(),
                           ),
                         );
-                      } else {
-                        _showNoPermissionDialog(context);
-                      }
-                    },
-                  ),
-                  _buildMenuButton(
-                    context,
-                    icon: Icons.settings,
-                    label: "Settings",
-                    color: Colors.grey,
-                    onTap: () {
-                      if (AppConfig.currentUserLevel == 1) {
+                      },
+                    ),
+                  if (AppConfig.permissions['Settings'] == true || AppConfig.currentUserLevel == 1)
+                    _buildMenuButton(
+                      context,
+                      icon: Icons.settings,
+                      label: "Settings",
+                      color: Colors.grey,
+                      onTap: () {
                         Navigator.of(context).push(
                           MaterialPageRoute(
                             builder: (context) => const SettingsScreen(),
                           ),
                         );
-                      } else {
-                        _showNoPermissionDialog(context);
-                      }
-                    },
-                  ),
+                      },
+                    ),
                 ],
               ),
             ),
           );
         },
-      ),
-    );
-  }
-
-  void _showNoPermissionDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("Access Denied"),
-        content: const Text("You don't have permission to access this screen. Please contact your administrator."),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("OK"),
-          ),
-        ],
       ),
     );
   }

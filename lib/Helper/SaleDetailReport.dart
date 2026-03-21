@@ -25,6 +25,8 @@ Future<void> exportSaleDetailReport(List<Map<String, dynamic>> queryData) async 
   // ၃။ Headers သတ်မှတ်ခြင်း
   List<String> headers = [
     "Sr",
+    "Station ID",
+    "Station Name",
     "VocNo",
     "Date",
     "Vehical No",
@@ -69,6 +71,8 @@ Future<void> exportSaleDetailReport(List<Map<String, dynamic>> queryData) async 
 
     final values = [
       "${i + 1}", // Sr
+      row['station_id'] ?? '-',
+      row['station_name'] ?? '-',
       row['VocNo'] ?? '-',
       row['S_Date'] ?? '-',
       row['Vehical_No'] ?? '-',

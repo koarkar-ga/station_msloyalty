@@ -9,6 +9,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bot_toast/bot_toast.dart';
 import 'package:station_msloyalty/Services/ActivityService.dart';
 import 'package:station_msloyalty/Helper/RewardQrScannerDialog.dart';
+import 'package:station_msloyalty/Model/OfflineTransaction.dart';
+import 'package:isar/isar.dart';
 
 class RewardPointScreen extends StatefulWidget {
   const RewardPointScreen({super.key});
@@ -81,7 +83,7 @@ class _RewardPointScreenState extends State<RewardPointScreen> {
                         ),
                         const SizedBox(height: 16),
                         // We use a fixed height or Wrap to avoid overflow in SingleChildScrollView
-                        Container(
+                        SizedBox(
                           height: 400,
                           child: GlassContainer(
                             child: const RedemptionHistoryList(),
@@ -274,6 +276,42 @@ class _RewardPointScreenState extends State<RewardPointScreen> {
     }
   }
 
+  Future<void> _handleOfflineRedeem(String userId, int rewardId, int requiredPoints, {String? tokenId}) async {
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Connection Offline"),
+        content: const Text("စနစ်ကို ချိတ်ဆက်မရပါ။ ဤ Reward ကို အော့ဖ်လိုင်း သိမ်းဆည်းထားလိုပါသလား?\n(အွန်လိုင်းရောက်မှသာ အောင်မြင်ကြောင်း အတည်ပြုနိုင်မည်ဖြစ်ပါသည်။)"),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Cancel")),
+          ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text("Save Offline")),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      final offlineTx = OfflineTransaction()
+        ..actionType = OfflineActionType.redeem
+        ..targetUid = userId
+        ..rewardId = rewardId
+        ..requiredPoints = requiredPoints
+        ..dynamicTokenId = tokenId
+        ..stationId = AppConfig.stationId
+        ..createdAt = DateTime.now()
+        ..isSynced = false;
+
+      await AppConfig.isar.writeTxn(() async {
+        await AppConfig.isar.offlineTransactions.put(offlineTx);
+      });
+
+      _showSuccess("Offline သိမ်းဆည်းပြီးပါပြီ။ Sync ပြန်လုပ်ပေးရန် လိုအပ်ပါသည်။");
+    } catch (e) {
+      _showError("Offline Save Error: $e");
+    }
+  }
+
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -313,18 +351,24 @@ class _RewardPointScreenState extends State<RewardPointScreen> {
   void _processRedemption(String qrData) async {
     String trimmedData = qrData.trim();
     if (trimmedData.isEmpty) return;
+
+    String? targetUserId;
+    int? targetRewardId;
+    int? pointsToRedeem;
+    String? currentTokenId;
+
     try {
       final String upperData = trimmedData.toUpperCase();
       if (upperData.contains('REDEEM|')) {
         int index = upperData.indexOf('REDEEM|');
         String actualData = trimmedData.substring(index);
-        String tokenId = actualData.split('|')[1].trim();
+        currentTokenId = actualData.split('|')[1].trim();
 
         BotToast.showLoading();
         final tokenResponse = await Supabase.instance.client
             .from('qr_tokens')
             .select('*, gift_cards(points_required)')
-            .eq('id', tokenId)
+            .eq('id', currentTokenId)
             .maybeSingle();
 
         BotToast.closeAllLoading();
@@ -345,44 +389,58 @@ class _RewardPointScreenState extends State<RewardPointScreen> {
           _showError("QR Code သက်တမ်းကုန်ဆုံးသွားပါပြီ (Expired)");
           return;
         }
-        String userId = tokenResponse['user_id'];
-        int rewardId = tokenResponse['reward_id'];
+        targetUserId = tokenResponse['user_id'];
+        targetRewardId = tokenResponse['reward_id'];
 
-        // Safely extract points_required whether Supabase returns a Map or a List
-        int pointsRequired = 0;
+        // Safely extract points_required
         var gcData = tokenResponse['gift_cards'];
         if (gcData is Map) {
-          pointsRequired = gcData['points_required'] ?? 0;
+          pointsToRedeem = gcData['points_required'] ?? 0;
         } else if (gcData is List && gcData.isNotEmpty) {
-          pointsRequired = gcData[0]['points_required'] ?? 0;
+          pointsToRedeem = gcData[0]['points_required'] ?? 0;
+        }
+      } else {
+        List<String> parts = trimmedData.split('|');
+        if (parts.length != 3) {
+          _showError("Invalid QR Format (မှားယွင်းနေပါသည်)");
+          return;
+        }
+        targetUserId = parts[0];
+        targetRewardId = int.parse(parts[1]);
+        int qrTimestamp = int.parse(parts[2]);
+        int currentTimestamp = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+        if ((currentTimestamp - qrTimestamp) > 300) {
+          _showError("QR Code သက်တမ်းကုန်ဆုံးသွားပါပြီ (Expired)");
+          return;
         }
 
-        await redeemReward(userId, rewardId, pointsRequired, tokenId: tokenId);
-        return;
+        final rewardData = await Supabase.instance.client
+            .from('gift_cards')
+            .select('points_required')
+            .eq('id', targetRewardId!)
+            .single();
+        pointsToRedeem = rewardData['points_required'] ?? 0;
       }
 
-      List<String> parts = trimmedData.split('|');
-      if (parts.length != 3) {
-        _showError("Invalid QR Format (မှားယွင်းနေပါသည်)");
-        return;
+      if (targetUserId != null && targetRewardId != null && pointsToRedeem != null) {
+        await redeemReward(targetUserId, targetRewardId, pointsToRedeem, tokenId: currentTokenId);
       }
-      String userId = parts[0];
-      int rewardId = int.parse(parts[1]);
-      int qrTimestamp = int.parse(parts[2]);
-      int currentTimestamp = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-      if ((currentTimestamp - qrTimestamp) > 300) {
-        _showError("QR Code သက်တမ်းကုန်ဆုံးသွားပါပြီ (Expired)");
-        return;
-      }
-      final rewardData = await Supabase.instance.client
-          .from('gift_cards')
-          .select('points_required')
-          .eq('id', rewardId)
-          .single();
-      int pointsRequired = rewardData['points_required'] ?? 0;
-      await redeemReward(userId, rewardId, pointsRequired);
     } catch (e) {
-      _showError("စနစ်ချို့ယွင်းချက်: $e");
+      final errorStr = e.toString();
+      if (errorStr.contains('SocketException') ||
+          errorStr.contains('HttpException') ||
+          errorStr.contains('HandshakeException') ||
+          errorStr.contains('Network') ||
+          errorStr.contains('failed to connect')) {
+        
+        if (targetUserId != null && targetRewardId != null && pointsToRedeem != null) {
+          _handleOfflineRedeem(targetUserId, targetRewardId, pointsToRedeem, tokenId: currentTokenId);
+        } else {
+           _showError("Network Error: အော့ဖ်လိုင်း သိမ်းဆည်းရန်အတွက် QR အချက်အလက် မပြည့်စုံပါ။");
+        }
+      } else {
+         _showError("စနစ်ချို့ယွင်းချက်: $e");
+      }
     } finally {
       BotToast.closeAllLoading();
     }

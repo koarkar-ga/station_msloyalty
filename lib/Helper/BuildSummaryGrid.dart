@@ -260,11 +260,16 @@ Future<List<PieChartSectionData>> _getRedemptionData() async {
     ).toUtc().toIso8601String();
 
     // gift_cards table နဲ့ join ပြီး title တွေပါ တစ်ခါတည်း ယူနိုင်တယ်
-    final response = await Supabase.instance.client
+    var query = Supabase.instance.client
         .from('redemption_history')
         .select('points_spent, gift_cards(title)')
-        .eq('station_id', AppConfig.stationId) // Filter by station
-        .gte('created_at', todayStart); // Filter by today
+        .gte('created_at', todayStart);
+    
+    if (AppConfig.stationId != 'ALL') {
+      query = query.eq('station_id', AppConfig.stationId);
+    }
+    
+    final response = await query;
 
     Map<String, double> summary = {};
     for (var item in response) {
@@ -299,11 +304,15 @@ Future<List<PieChartSectionData>> _getSaleTypeData() async {
       now.day,
     ).toUtc().toIso8601String();
 
+    if (AppConfig.stationId == 'ALL') {
+      return []; // API aggregation not supported
+    }
+
     final url = Uri.parse('${AppConfig.apiUrl}/api/summary/saletypes').replace(
       queryParameters: {'stationId': AppConfig.stationId, 'date': todayStart},
     );
 
-    final response = await http.get(url);
+    final response = await http.get(url, headers: AppConfig.headers);
 
     if (response.statusCode == 200) {
       List<dynamic> data = jsonDecode(response.body);
@@ -334,11 +343,15 @@ Future<List<PieChartSectionData>> _getFuelSaleData() async {
       now.day,
     ).toUtc().toIso8601String();
 
+    if (AppConfig.stationId == 'ALL') {
+      return []; // API aggregation not supported
+    }
+
     final url = Uri.parse('${AppConfig.apiUrl}/api/summary/fuelsales').replace(
       queryParameters: {'stationId': AppConfig.stationId, 'date': todayStart},
     );
 
-    final response = await http.get(url);
+    final response = await http.get(url, headers: AppConfig.headers);
 
     if (response.statusCode == 200) {
       List<dynamic> data = jsonDecode(response.body);
@@ -368,11 +381,16 @@ Future<List<PieChartSectionData>> _getRewardPointData() async {
     now.day,
   ).toUtc().toIso8601String();
 
-  final response = await Supabase.instance.client
+  var query = Supabase.instance.client
       .from('fuel_transactions')
       .select('points_earned, fuel_type')
-      .eq('station_id', AppConfig.stationId) // Filter by station
       .gte('created_at', todayStart);
+  
+  if (AppConfig.stationId != 'ALL') {
+    query = query.eq('station_id', AppConfig.stationId);
+  }
+
+  final response = await query;
 
   if ((response as List).isEmpty) {
     return [];

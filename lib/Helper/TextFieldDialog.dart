@@ -2,7 +2,6 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:station_msloyalty/AppConfig.dart';
 import 'package:station_msloyalty/Services/ActivityService.dart';
 import 'package:station_msloyalty/config.dart' as Config;
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -33,29 +32,35 @@ class TextFieldDialog extends StatefulWidget {
   _TextFieldDialogState createState() => _TextFieldDialogState();
 }
 
-class _TextFieldDialogState extends State<TextFieldDialog> with SingleTickerProviderStateMixin {
+class _TextFieldDialogState extends State<TextFieldDialog>
+    with SingleTickerProviderStateMixin {
   final TextEditingController _controller = TextEditingController();
   late AnimationController _animationController;
-  bool _isLoading = false; 
-  String? _errorMessage; 
+  bool _isLoading = false;
+  String? _errorMessage;
   final FocusNode _focusNode = FocusNode();
 
   @override
   void initState() {
     super.initState();
-    _animationController = AnimationController(vsync: this, duration: const Duration(seconds: 1))
-      ..repeat(reverse: true);
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 1),
+    )..repeat(reverse: true);
   }
 
   @override
   void dispose() {
     _controller.dispose();
-    _animationController.dispose(); 
+    _animationController.dispose();
     _focusNode.dispose();
     super.dispose();
   }
 
-  Future<void> _handleCollect(BuildContext dialogContext, StateSetter? setDialogState) async {
+  Future<void> _handleCollect(
+    BuildContext dialogContext,
+    StateSetter? setDialogState,
+  ) async {
     final String qrValue = _controller.text.trim();
     if (qrValue.isEmpty) {
       if (setDialogState != null) {
@@ -85,7 +90,7 @@ class _TextFieldDialogState extends State<TextFieldDialog> with SingleTickerProv
       final String upperQr = qrValue.toUpperCase();
       if (upperQr.startsWith('EARN|')) {
         dynamicTokenId = qrValue.split('|').last.trim();
-        
+
         final tokenRes = await widget.supabase
             .from('qr_tokens')
             .select('user_id, expires_at, is_used')
@@ -118,7 +123,8 @@ class _TextFieldDialogState extends State<TextFieldDialog> with SingleTickerProv
         final int qrTimestamp = qrData['t'] ?? 0;
 
         final int currentMs = DateTime.now().millisecondsSinceEpoch;
-        final int diffInSeconds = ((currentMs - qrTimestamp).abs() / 1000).round();
+        final int diffInSeconds = ((currentMs - qrTimestamp).abs() / 1000)
+            .round();
 
         if (diffInSeconds > 300) {
           throw "QR Code သက်တမ်းကုန်ဆုံးသွားပါပြီ (Expired)";
@@ -132,13 +138,13 @@ class _TextFieldDialogState extends State<TextFieldDialog> with SingleTickerProv
       // Fetch today's count and pipd
       final DateTime now = DateTime.now();
       final String todayStr = DateFormat('yyyy-MM-dd').format(now);
-      
+
       final countRes = await widget.supabase
           .from('fuel_transactions')
           .select('id')
           .eq('user_id', targetUid)
           .gte('created_at', todayStr);
-      
+
       final int todayCount = (countRes as List).length;
 
       final settingsRes = await widget.supabase
@@ -146,7 +152,7 @@ class _TextFieldDialogState extends State<TextFieldDialog> with SingleTickerProv
           .select('pipd')
           .limit(1)
           .maybeSingle();
-      
+
       final int pipd = settingsRes?['pipd'] ?? 1;
 
       if (todayCount >= pipd) {
@@ -175,15 +181,13 @@ class _TextFieldDialogState extends State<TextFieldDialog> with SingleTickerProv
 
       if (res['status'] == 'success') {
         final pointsAdded = res['points_added']?.toString() ?? '0';
-        
+
         if (dynamicTokenId != null) {
           await widget.supabase
               .from('qr_tokens')
               .update({
                 'is_used': true,
-                'metadata': {
-                  'points': pointsAdded,
-                }
+                'metadata': {'points': pointsAdded},
               })
               .eq('id', dynamicTokenId);
         }
@@ -191,7 +195,8 @@ class _TextFieldDialogState extends State<TextFieldDialog> with SingleTickerProv
         // Log Point Collection Activity
         await ActivityService.logActivity(
           actionType: 'collect_point',
-          description: 'Collected $pointsAdded points for Voucher ${widget.voc_no}',
+          description:
+              'Collected $pointsAdded points for Voucher ${widget.voc_no}',
           metadata: {
             'voc_no': widget.voc_no,
             'amount': widget.amount,
@@ -206,20 +211,24 @@ class _TextFieldDialogState extends State<TextFieldDialog> with SingleTickerProv
       } else {
         if (setDialogState != null) {
           setDialogState(() {
-            _errorMessage = res['message']?.toString() ?? 'Something went wrong';
+            _errorMessage =
+                res['message']?.toString() ?? 'Something went wrong';
           });
         } else {
           setState(() {
-            _errorMessage = res['message']?.toString() ?? 'Something went wrong';
+            _errorMessage =
+                res['message']?.toString() ?? 'Something went wrong';
           });
         }
       }
     } catch (e) {
       if (!mounted) return;
-      String errorMsg = e.toString().contains("QR ပုံစံ") || e.toString().contains("သက်တမ်းကုန်")
-              ? e.toString()
-              : "Error: ${e.toString()}";
-      
+      String errorMsg =
+          e.toString().contains("QR ပုံစံ") ||
+              e.toString().contains("သက်တမ်းကုန်")
+          ? e.toString()
+          : "Error: ${e.toString()}";
+
       if (setDialogState != null) {
         setDialogState(() {
           _errorMessage = errorMsg;
@@ -240,7 +249,10 @@ class _TextFieldDialogState extends State<TextFieldDialog> with SingleTickerProv
     }
   }
 
-  Future<void> _handleCollectWithState(StateSetter setDialogState, BuildContext dialogContext) async {
+  Future<void> _handleCollectWithState(
+    StateSetter setDialogState,
+    BuildContext dialogContext,
+  ) async {
     await _handleCollect(dialogContext, setDialogState);
   }
 
@@ -253,7 +265,11 @@ class _TextFieldDialogState extends State<TextFieldDialog> with SingleTickerProv
           color: const Color(0xFF10B981).withValues(alpha: 0.1),
           shape: BoxShape.circle,
         ),
-        child: const Icon(Icons.qr_code_scanner_rounded, size: 24, color: Color(0xFF10B981)),
+        child: const Icon(
+          Icons.qr_code_scanner_rounded,
+          size: 24,
+          color: Color(0xFF10B981),
+        ),
       ),
       onPressed: () => _showScanDialog(),
     );
@@ -271,13 +287,19 @@ class _TextFieldDialogState extends State<TextFieldDialog> with SingleTickerProv
         builder: (context, setDialogState) {
           return Dialog(
             backgroundColor: Colors.transparent,
-            insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+            insetPadding: const EdgeInsets.symmetric(
+              horizontal: 20,
+              vertical: 24,
+            ),
             child: Container(
               width: 500,
               decoration: BoxDecoration(
                 color: const Color(0xFF0A192F),
                 borderRadius: BorderRadius.circular(28),
-                border: Border.all(color: const Color(0xFFFFD700).withValues(alpha: 0.2), width: 1.5),
+                border: Border.all(
+                  color: const Color(0xFFFFD700).withValues(alpha: 0.2),
+                  width: 1.5,
+                ),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withValues(alpha: 0.5),
@@ -293,7 +315,10 @@ class _TextFieldDialogState extends State<TextFieldDialog> with SingleTickerProv
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 24),
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 24,
+                          horizontal: 24,
+                        ),
                         decoration: const BoxDecoration(
                           gradient: LinearGradient(
                             colors: [Color(0xFF0A192F), Color(0xFF1B4F72)],
@@ -306,10 +331,16 @@ class _TextFieldDialogState extends State<TextFieldDialog> with SingleTickerProv
                             Container(
                               padding: const EdgeInsets.all(10),
                               decoration: BoxDecoration(
-                                color: const Color(0xFFFFD700).withValues(alpha: 0.1),
+                                color: const Color(
+                                  0xFFFFD700,
+                                ).withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(12),
                               ),
-                              child: const Icon(Icons.stars_rounded, color: Color(0xFFFFD700), size: 28),
+                              child: const Icon(
+                                Icons.stars_rounded,
+                                color: Color(0xFFFFD700),
+                                size: 28,
+                              ),
                             ),
                             const SizedBox(width: 16),
                             const Expanded(
@@ -327,14 +358,20 @@ class _TextFieldDialogState extends State<TextFieldDialog> with SingleTickerProv
                                   ),
                                   Text(
                                     'Scan customer QR to issue points',
-                                    style: TextStyle(color: Colors.white70, fontSize: 12),
+                                    style: TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 12,
+                                    ),
                                   ),
                                 ],
                               ),
                             ),
                             IconButton(
                               onPressed: () => Navigator.pop(context),
-                              icon: const Icon(Icons.close_rounded, color: Colors.white54),
+                              icon: const Icon(
+                                Icons.close_rounded,
+                                color: Colors.white54,
+                              ),
                             ),
                           ],
                         ),
@@ -353,7 +390,10 @@ class _TextFieldDialogState extends State<TextFieldDialog> with SingleTickerProv
                                 enabled: true,
                                 controller: _controller,
                                 autofocus: true,
-                                style: const TextStyle(color: Colors.transparent, fontSize: 1),
+                                style: const TextStyle(
+                                  color: Colors.transparent,
+                                  fontSize: 1,
+                                ),
                                 cursorColor: Colors.transparent,
                                 decoration: const InputDecoration(
                                   border: InputBorder.none,
@@ -361,36 +401,62 @@ class _TextFieldDialogState extends State<TextFieldDialog> with SingleTickerProv
                                   focusedBorder: InputBorder.none,
                                 ),
                                 onChanged: (val) {
-                                  if (val.contains('\n') || val.contains('\r')) {
-                                    _handleCollectWithState(setDialogState, context);
+                                  if (val.contains('\n') ||
+                                      val.contains('\r')) {
+                                    _handleCollectWithState(
+                                      setDialogState,
+                                      context,
+                                    );
                                   }
                                 },
-                                onSubmitted: (_) => _isLoading ? null : _handleCollectWithState(setDialogState, context),
-                                onTapOutside: (event) => !_isLoading ? _focusNode.requestFocus() : null,
+                                onSubmitted: (_) => _isLoading
+                                    ? null
+                                    : _handleCollectWithState(
+                                        setDialogState,
+                                        context,
+                                      ),
+                                onTapOutside: (event) => !_isLoading
+                                    ? _focusNode.requestFocus()
+                                    : null,
                               ),
                             ),
                             Container(
                               height: 200,
                               width: double.infinity,
                               decoration: BoxDecoration(
-                                color: const Color(0xFF1B4F72).withValues(alpha: 0.1),
+                                color: const Color(
+                                  0xFF1B4F72,
+                                ).withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(20),
-                                border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.05),
+                                ),
                               ),
                               child: Stack(
                                 alignment: Alignment.center,
                                 children: [
                                   Opacity(
                                     opacity: 0.05,
-                                    child: const Icon(Icons.rocket_launch_rounded, size: 120, color: Colors.white),
+                                    child: const Icon(
+                                      Icons.rocket_launch_rounded,
+                                      size: 120,
+                                      color: Colors.white,
+                                    ),
                                   ),
                                   if (_isLoading)
-                                    const CircularProgressIndicator(color: Color(0xFFFFD700))
+                                    const CircularProgressIndicator(
+                                      color: Color(0xFFFFD700),
+                                    )
                                   else
                                     Column(
-                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
                                       children: [
-                                        const Icon(Icons.qr_code_scanner_rounded, color: Color(0xFFFFD700), size: 48),
+                                        const Icon(
+                                          Icons.qr_code_scanner_rounded,
+                                          color: Color(0xFFFFD700),
+                                          size: 48,
+                                        ),
                                         const SizedBox(height: 16),
                                         const Text(
                                           "READY TO SCAN",
@@ -404,7 +470,10 @@ class _TextFieldDialogState extends State<TextFieldDialog> with SingleTickerProv
                                         const SizedBox(height: 4),
                                         Text(
                                           "Using hardware QR scanner...",
-                                          style: TextStyle(color: Colors.blueGrey[300], fontSize: 11),
+                                          style: TextStyle(
+                                            color: Colors.blueGrey[300],
+                                            fontSize: 11,
+                                          ),
                                         ),
                                       ],
                                     ),
@@ -414,20 +483,32 @@ class _TextFieldDialogState extends State<TextFieldDialog> with SingleTickerProv
                             if (_errorMessage != null) ...[
                               const SizedBox(height: 16),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 12,
+                                ),
                                 decoration: BoxDecoration(
                                   color: Colors.red.withValues(alpha: 0.1),
                                   borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: Colors.red.withValues(alpha: 0.2)),
+                                  border: Border.all(
+                                    color: Colors.red.withValues(alpha: 0.2),
+                                  ),
                                 ),
                                 child: Row(
                                   children: [
-                                    const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 18),
+                                    const Icon(
+                                      Icons.error_outline_rounded,
+                                      color: Colors.redAccent,
+                                      size: 18,
+                                    ),
                                     const SizedBox(width: 12),
                                     Expanded(
                                       child: Text(
                                         _errorMessage!,
-                                        style: const TextStyle(color: Colors.redAccent, fontSize: 13),
+                                        style: const TextStyle(
+                                          color: Colors.redAccent,
+                                          fontSize: 13,
+                                        ),
                                       ),
                                     ),
                                   ],
@@ -442,16 +523,36 @@ class _TextFieldDialogState extends State<TextFieldDialog> with SingleTickerProv
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: const Color(0xFFFFD700),
                                   foregroundColor: const Color(0xFF0A192F),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
                                   elevation: 8,
-                                  shadowColor: const Color(0xFFFFD700).withValues(alpha: 0.4),
+                                  shadowColor: const Color(
+                                    0xFFFFD700,
+                                  ).withValues(alpha: 0.4),
                                 ),
-                                onPressed: _isLoading ? null : () => _handleCollectWithState(setDialogState, context),
+                                onPressed: _isLoading
+                                    ? null
+                                    : () => _handleCollectWithState(
+                                        setDialogState,
+                                        context,
+                                      ),
                                 child: _isLoading
-                                    ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF0A192F)))
+                                    ? const SizedBox(
+                                        width: 24,
+                                        height: 24,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Color(0xFF0A192F),
+                                        ),
+                                      )
                                     : const Text(
                                         "CONFIRM COLLECTION",
-                                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, letterSpacing: 1.1),
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 16,
+                                          letterSpacing: 1.1,
+                                        ),
                                       ),
                               ),
                             ),
@@ -479,13 +580,24 @@ class _TextFieldDialogState extends State<TextFieldDialog> with SingleTickerProv
       ),
       child: Column(
         children: [
-          _infoRow('Voucher No', widget.voc_no, valueColor: const Color(0xFFFFD700)),
+          _infoRow(
+            'Voucher No',
+            widget.voc_no,
+            valueColor: const Color(0xFFFFD700),
+          ),
           const Divider(height: 24, color: Colors.white10),
-          _infoRow('Vehicle No', widget.vehical_no.isEmpty ? '-' : widget.vehical_no),
+          _infoRow(
+            'Vehicle No',
+            widget.vehical_no.isEmpty ? '-' : widget.vehical_no,
+          ),
           const SizedBox(height: 12),
           _infoRow('Fuel Type', widget.fuel_type),
           const SizedBox(height: 12),
-          _infoRow('Sale Type', widget.sale_type, valueColor: _getSaleTypeColor(widget.sale_type)),
+          _infoRow(
+            'Sale Type',
+            widget.sale_type,
+            valueColor: _getSaleTypeColor(widget.sale_type),
+          ),
           const Divider(height: 24, color: Colors.white10),
           _infoRow(
             'Total Amount',
@@ -499,11 +611,20 @@ class _TextFieldDialogState extends State<TextFieldDialog> with SingleTickerProv
     );
   }
 
-  Widget _infoRow(String label, String value, {Color? valueColor, bool isBold = false, double fontSize = 13}) {
+  Widget _infoRow(
+    String label,
+    String value, {
+    Color? valueColor,
+    bool isBold = false,
+    double fontSize = 13,
+  }) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: const TextStyle(fontSize: 13, color: Colors.white54)),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 13, color: Colors.white54),
+        ),
         Text(
           value,
           style: TextStyle(
@@ -564,7 +685,11 @@ class _TextFieldDialogState extends State<TextFieldDialog> with SingleTickerProv
                     color: Colors.green.shade50,
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(Icons.check_circle, color: Colors.green.shade600, size: 64),
+                  child: Icon(
+                    Icons.check_circle,
+                    color: Colors.green.shade600,
+                    size: 64,
+                  ),
                 ),
                 const SizedBox(height: 24),
                 const Text(
@@ -589,11 +714,16 @@ class _TextFieldDialogState extends State<TextFieldDialog> with SingleTickerProv
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green.shade600,
                       foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
                     onPressed: () => Navigator.pop(context),
-                    child: const Text("OK", style: TextStyle(fontWeight: FontWeight.bold)),
+                    child: const Text(
+                      "OK",
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
                   ),
                 ),
               ],
