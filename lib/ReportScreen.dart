@@ -7,7 +7,6 @@ import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:station_msloyalty/AppConfig.dart';
 import 'package:station_msloyalty/Helper/BuildProgessOverlay.dart';
-import 'package:station_msloyalty/Helper/DataCell.dart';
 import 'package:station_msloyalty/Helper/FetchWithProgress.dart';
 import 'package:station_msloyalty/Helper/MsAppBar.dart';
 import 'package:station_msloyalty/Helper/PumpBySaleReport.dart';
@@ -15,7 +14,6 @@ import 'package:station_msloyalty/Helper/SaleDetailReport.dart';
 import 'package:station_msloyalty/Model/SaleLoadStatus.dart';
 import 'package:station_msloyalty/summary_view.dart';
 import 'package:station_msloyalty/Constants/StyleConstants.dart';
-import 'package:station_msloyalty/Screens/CheckAlreadyCollectedReport.dart';
 import 'package:station_msloyalty/Screens/ReportDetailListScreen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -506,63 +504,6 @@ class _ReportsScreen extends State<ReportsScreen> {
     }
   }
 
-  Widget _fieldSearchInput(String hint, Function(String) onChanged) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 4),
-      height: 30,
-      child: TextField(
-        onChanged: onChanged,
-        style: const TextStyle(fontSize: 11),
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: TextStyle(
-            color: isDark ? Colors.white24 : Colors.grey,
-            fontSize: 10,
-          ),
-          isDense: true,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 8,
-            vertical: 8,
-          ),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
-        ),
-      ),
-    );
-  }
-
-  Widget _fieldDropdownFilter(
-    String value,
-    List<String> options,
-    Function(String?) onChanged,
-  ) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 4),
-      height: 30,
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      decoration: BoxDecoration(
-        border: Border.all(
-          color: isDark ? Colors.white24 : Colors.grey.shade400,
-        ),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: options.contains(value) ? value : options.first,
-          isExpanded: true,
-          style: TextStyle(
-            fontSize: 10,
-            color: isDark ? Colors.white : Colors.black,
-          ),
-          items: options
-              .map((opt) => DropdownMenuItem(value: opt, child: Text(opt)))
-              .toList(),
-          onChanged: onChanged,
-        ),
-      ),
-    );
-  }
 
   // Sales Data ကို Sale Type အလိုက် ခွဲခြားတွက်ချက်ခြင်း
   Map<String, double> _calculateSalesByType() {
@@ -698,7 +639,7 @@ class _ReportsScreen extends State<ReportsScreen> {
                           _buildHeaderInfo(isMobile),
                           _salesData.isEmpty
                               ? _buildEmptyState()
-                              : _buildMobileShowDetailButton(status.data),
+                              : _buildShowDetailButton(status.data),
                         ] else
                           _buildInitialSelectStationState(),
                       ],
@@ -715,15 +656,9 @@ class _ReportsScreen extends State<ReportsScreen> {
                                 : null,
                           ),
                           _buildHeaderInfo(isMobile),
-                          Expanded(
-                            flex: 1,
-                            child: _salesData.isEmpty
-                                ? _buildEmptyState()
-                                : _buildDataTable(
-                                    status.data,
-                                    status.isLoading,
-                                  ),
-                          ),
+                          _salesData.isEmpty
+                              ? _buildEmptyState()
+                              : _buildShowDetailButton(status.data),
                         ] else
                           Expanded(child: _buildInitialSelectStationState()),
                       ],
@@ -816,374 +751,7 @@ class _ReportsScreen extends State<ReportsScreen> {
     );
   }
 
-  Widget _buildHeaderCell(String text, int flex, Color color) {
-    return Expanded(
-      flex: flex,
-      child: Text(
-        text,
-        style: TextStyle(
-          fontWeight: FontWeight.w900,
-          color: color,
-          fontSize: 13,
-          letterSpacing: 0.5,
-        ),
-        textAlign: TextAlign.center,
-      ),
-    );
-  }
 
-  // Build Data Table
-  Widget _buildDataTable(List<dynamic> rawData, bool isLoading) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final headerColor = isDark ? StyleConstants.darkSurface : Colors.white;
-    final textColor = isDark ? Colors.white : Colors.black;
-
-    // Use filtered data
-    final data = _filteredSalesData;
-
-    // Dynamic Filter Options
-    final fuelTypes = [
-      "ALL",
-      ..._salesData
-          .map((s) => s['FuelTypeName']?.toString() ?? 'Unknown')
-          .toSet(),
-    ];
-    final saleTypes = [
-      "ALL",
-      ..._salesData
-          .map((s) => s['Sale_Type_name']?.toString() ?? 'Unknown')
-          .toSet(),
-    ];
-
-    return Column(
-      children: [
-        // ၁။ Header & Filter အပိုင်း
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Container(
-            width: 1400,
-            decoration: BoxDecoration(
-              color: headerColor,
-              border: Border.all(
-                color: (isDark ? Colors.white : Colors.teal).withOpacity(0.2),
-              ),
-            ),
-            child: Column(
-              children: [
-                // Main Header Row
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 12,
-                    horizontal: 8,
-                  ),
-                  child: Row(
-                    children: [
-                      _buildHeaderCell('No', 1, textColor),
-                      _buildHeaderCell('Station', 2, textColor),
-                      _buildHeaderCell('Voucher No', 2, textColor),
-                      _buildHeaderCell('Fuel Type', 2, textColor),
-                      _buildHeaderCell('Price', 2, textColor),
-                      // Sorting Toggle for Date & Time
-                      Expanded(
-                        flex: 3,
-                        child: InkWell(
-                          onTap: () =>
-                              setState(() => _sortAscending = !_sortAscending),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                'Date & Time',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w900,
-                                  color: textColor,
-                                  fontSize: 13,
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              Icon(
-                                _sortAscending
-                                    ? Icons.arrow_upward
-                                    : Icons.arrow_downward,
-                                size: 14,
-                                color: Colors.teal,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      _buildHeaderCell('Vehicle No', 2, textColor),
-                      _buildHeaderCell('Sale Type', 2, textColor),
-                      _buildHeaderCell('Liter', 2, textColor),
-                      _buildHeaderCell('Amount', 2, textColor),
-                      _buildHeaderCell('Action', 2, textColor),
-                    ],
-                  ),
-                ),
-                // Filter Search Row
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 4,
-                    horizontal: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isDark ? Colors.black12 : Colors.grey.shade50,
-                    border: Border(
-                      top: BorderSide(
-                        color: (isDark ? Colors.white : Colors.teal)
-                            .withOpacity(0.1),
-                      ),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      const Expanded(flex: 1, child: SizedBox()), // No
-                      const Expanded(flex: 2, child: SizedBox()), // Station
-                      // Voucher Search
-                      Expanded(
-                        flex: 2,
-                        child: _fieldSearchInput(
-                          "Search Voucher",
-                          (val) => setState(() => _searchVoucher = val),
-                        ),
-                      ),
-                      // Fuel Type Filter
-                      Expanded(
-                        flex: 2,
-                        child: _fieldDropdownFilter(
-                          _filterFuelType,
-                          fuelTypes,
-                          (val) => setState(() => _filterFuelType = val!),
-                        ),
-                      ),
-                      const Expanded(flex: 2, child: SizedBox()), // Price
-                      const Expanded(flex: 3, child: SizedBox()), // Date
-                      // Vehicle Search
-                      Expanded(
-                        flex: 2,
-                        child: _fieldSearchInput(
-                          "Search Vehicle",
-                          (val) => setState(() => _searchVehicle = val),
-                        ),
-                      ),
-                      // Sale Type Filter
-                      Expanded(
-                        flex: 2,
-                        child: _fieldDropdownFilter(
-                          _filterSaleType,
-                          saleTypes,
-                          (val) => setState(() => _filterSaleType = val!),
-                        ),
-                      ),
-                      const Expanded(flex: 2, child: SizedBox()), // Liter
-                      const Expanded(flex: 2, child: SizedBox()), // Amount
-                      const Expanded(flex: 2, child: SizedBox()), // Action
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-
-        // ၂။ Scrollable Body အပိုင်း
-        Expanded(
-          child: isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : data.isEmpty && !isLoading
-              ? const Center(child: Text("မှတ်တမ်းမရှိပါ"))
-              : SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: SizedBox(
-                    width: 1400, // Fixed width for horizontal scrolling
-                    child: ListView.builder(
-                      itemCount: data.length,
-                      itemBuilder: (context, index) {
-                        final isDark =
-                            Theme.of(context).brightness == Brightness.dark;
-                        final sale = data[index];
-                        final bool isEven = index % 2 == 0;
-                        final Color rowColor = isEven
-                            ? (isDark
-                                  ? StyleConstants.darkBg
-                                  : Colors.blueGrey.shade50)
-                            : (isDark
-                                  ? StyleConstants.darkSurface
-                                  : Colors.white);
-                        return Container(
-                          padding: const EdgeInsets.symmetric(
-                            vertical: 12,
-                            horizontal: 15,
-                          ),
-                          decoration: BoxDecoration(
-                            color: rowColor,
-                            border: Border(
-                              bottom: BorderSide(
-                                color:
-                                    (isDark
-                                            ? Colors.white
-                                            : Colors.grey.shade300)
-                                        .withOpacity(0.1),
-                              ),
-                              left: BorderSide(
-                                color: Colors.grey.shade300,
-                              ), // ဘယ်ဘက်မျဉ်း
-                              right: BorderSide(
-                                color: Colors.grey.shade300,
-                              ), // ညာဘက်မျဉ်း
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              _buildTableCell(
-                                '${index + 1}',
-                                1,
-                                isText: true,
-                              ), // အမှတ်စဉ်
-                              _buildTableCell(
-                                '${sale['station_name'] ?? '-'} (${sale['station_id'] ?? '-'})',
-                                2,
-                                isText: true,
-                              ),
-                              _buildTableCell(
-                                '${sale['VocNo']}',
-                                2,
-                                isText: true,
-                              ), // Invoice No
-                              dataCell(
-                                "${sale['FuelTypeName']}",
-                                150,
-                                cardColor: getFuelColor(
-                                  sale['FuelTypeName'] ?? '',
-                                ),
-                                showRightBorder: true,
-                                alignment: Alignment
-                                    .center, // Sale Type Badge ကိုတော့ အလယ်မှာပဲထားမယ်
-                              ),
-                              // ယနေ့ပေါက်ဈေး (D1_FuelType မှလာသော SalePrice)
-                              _buildTableCell(
-                                NumberFormat(
-                                  '#,###',
-                                ).format(sale['TodayPrice'] ?? 0),
-                                2,
-                                isNumeric: true,
-                              ),
-                              _buildTableCell(
-                                DateFormat(
-                                  'dd-MM-yy HH:mm:ss',
-                                ).format(_parseServerDateTime(sale['S_Date'])),
-                                3,
-                              ),
-                              _buildTableCell(
-                                '${sale['Vehical_No'] ?? '-'}',
-                                2,
-                                isText: true,
-                              ), // Vehicle No
-                              // _buildTableCell('${sale['Sale_Type_name'] ?? '-'}', 2),
-                              dataCell(
-                                "${sale['Sale_Type_name']}",
-                                150,
-                                cardColor: getSaleTypeColor(
-                                  sale['Sale_Type_name'] ?? '',
-                                ),
-                                showRightBorder: true,
-                                alignment: Alignment
-                                    .center, // Sale Type Badge ကိုတော့ အလယ်မှာပဲထားမယ်
-                              ),
-
-                              _buildTableCell(
-                                '${double.tryParse(sale['SALELITER'].toString())?.toStringAsFixed(2)}',
-                                2,
-                              ),
-                              _buildTableCell(
-                                NumberFormat('#,###').format(
-                                  double.tryParse(
-                                        sale['TotalPrice'].toString(),
-                                      ) ??
-                                      0,
-                                ),
-                                2,
-                                isNumeric: true,
-                              ),
-                              sale['Sale_Type_name'] == 'Cash Sale' ||
-                                      sale['Sale_Type_name'] == 'ePayment'
-                                  ? _buildTableCell(
-                                      CheckAlreadyCollectedReport(
-                                        sale: sale,
-                                        supabase: supabase,
-                                      ),
-                                      2,
-                                      isAction: true,
-                                    )
-                                  : _buildTableCell(
-                                      IconButton(
-                                        onPressed: null,
-                                        icon: const Icon(
-                                          Icons.not_interested_rounded,
-                                          size: 20,
-                                          color: Colors.red,
-                                        ),
-                                        tooltip:
-                                            '${sale['Sale_Type_name']} အတွက် ခွင့်မပြုပါ',
-                                      ),
-                                      2,
-                                      isAction: true,
-                                    ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ),
-        ),
-      ],
-    );
-  }
-
-  // Build Table Cell
-  Widget _buildTableCell(
-    dynamic content,
-    int flexValue, {
-    bool isNumeric = false,
-    bool isText = false,
-    bool isBold = false,
-    bool isAction = false,
-  }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final align = isNumeric
-        ? TextAlign.right
-        : (isText ? TextAlign.left : TextAlign.center);
-    return Expanded(
-      flex: flexValue,
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: 12,
-          vertical: 1,
-        ), // Cell Padding
-        decoration: BoxDecoration(
-          border: Border(
-            right: BorderSide(
-              color: (isDark ? Colors.white : Colors.grey.shade300).withOpacity(
-                0.1,
-              ),
-            ), // ကော်လံကြားမျဉ်း (Vertical Line)
-          ),
-        ),
-        child: isAction && content is Widget
-            ? content
-            : Text(
-                content?.toString() ?? '',
-                textAlign: align,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
-                  color: isDark ? Colors.white : StyleConstants.lightText,
-                ),
-              ),
-      ),
-    );
-  }
 
   // Sale Type Summary Table
   Widget _buildTypeSummaryTable(bool isMobile) {
@@ -1390,7 +958,7 @@ class _ReportsScreen extends State<ReportsScreen> {
     );
   }
 
-  Widget _buildMobileShowDetailButton(List<dynamic> data) {
+  Widget _buildShowDetailButton(List<dynamic> data) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(20),

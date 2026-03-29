@@ -7,6 +7,7 @@ import 'package:station_msloyalty/AppConfig.dart';
 import 'package:station_msloyalty/DashboardScreen.dart';
 import 'package:station_msloyalty/LoyaltyReportScreen.dart';
 import 'package:station_msloyalty/login_page.dart';
+import 'package:station_msloyalty/Screens/StockReportScreen.dart';
 import 'package:station_msloyalty/Services/ActivityService.dart';
 
 class AppLauncherScreen extends StatelessWidget {
@@ -136,6 +137,21 @@ class AppLauncherScreen extends StatelessWidget {
                           context,
                           MaterialPageRoute(
                             builder: (context) => const LoyaltyReportScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                  if (AppConfig.permissions['Reports'] == true || AppConfig.currentUserLevel == 1)
+                    _buildMenuButton(
+                      context,
+                      icon: Icons.inventory_2_rounded,
+                      label: "Stock Report",
+                      color: Colors.brown,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const StockReportScreen(),
                           ),
                         );
                       },
