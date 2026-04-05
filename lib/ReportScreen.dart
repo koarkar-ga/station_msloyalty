@@ -39,7 +39,7 @@ class _ReportsScreen extends State<ReportsScreen> {
   bool isLoadingSidebar = false; // Sidebar loading state
 
   List<Map<String, dynamic>> _stations = [];
-  String? _selectedStationId;
+  List<String> _selectedStationIds = [];
 
   //Range Text Controller for Time Closed
   final TextEditingController _rangeTimeClosedController =
@@ -62,6 +62,8 @@ class _ReportsScreen extends State<ReportsScreen> {
   // Table Filter & Sort State
   String _searchVoucher = "";
   String _searchVehicle = "";
+  final TextEditingController _voucherSearchController = TextEditingController();
+  final TextEditingController _vehicleSearchController = TextEditingController();
   String _filterFuelType = "ALL";
   String _filterSaleType = "ALL";
   bool _sortAscending = false;
@@ -179,24 +181,50 @@ class _ReportsScreen extends State<ReportsScreen> {
     try {
       final response = await supabase
           .from('stations')
-          .select('station_id, name')
+          .select('station_id, name, region')
           .order('name');
 
       if (mounted) {
         setState(() {
-          _stations = List<Map<String, dynamic>>.from(response);
+          _stations = List<Map<String, dynamic>>.from(response.map((e) => {
+                ...e,
+                'region': e['region'] ?? 'Other',
+              }));
           // HO User (level 1) သို့မဟုတ် Supervisor (level 2) ဖြစ်လျှင် ALL STATIONS ထည့်ပေးမယ်
           if (AppConfig.currentUserLevel == 1 ||
               AppConfig.currentUserLevel == 2) {
             _stations.insert(0, {'station_id': 'ALL', 'name': 'ALL STATIONS'});
           }
           // Default stationId ကို null ထားမယ် (User ကို ရွေးခိုင်းမယ်)
-          _selectedStationId = null;
+          _selectedStationIds = [];
         });
       }
     } catch (e) {
       debugPrint("Error fetching stations: $e");
     }
+  }
+
+  Map<String, List<Map<String, dynamic>>> _groupStationsByRegion() {
+    final Map<String, List<Map<String, dynamic>>> grouped = {};
+    for (var station in _stations) {
+      if (station['station_id'] == 'ALL') continue;
+      final region = station['region']?.toString() ?? 'Other';
+      if (!grouped.containsKey(region)) {
+        grouped[region] = [];
+      }
+      grouped[region]!.add(station);
+    }
+    return grouped;
+  }
+
+  // Helper to get actual list of station names/ids to fetch
+  List<Map<String, dynamic>> _getEffectiveSelectedStations() {
+    if (_selectedStationIds.contains('ALL')) {
+      return _stations.where((s) => s['station_id'] != 'ALL').toList();
+    }
+    return _stations
+        .where((s) => _selectedStationIds.contains(s['station_id']))
+        .toList();
   }
 
   // Initial Data Fetching
@@ -210,6 +238,13 @@ class _ReportsScreen extends State<ReportsScreen> {
 
   @override
   void dispose() {
+    _rangeTimeClosedController.dispose();
+    _startDateController.dispose();
+    _endDateController.dispose();
+    _startTimeController.dispose();
+    _endTimeController.dispose();
+    _voucherSearchController.dispose();
+    _vehicleSearchController.dispose();
     super.dispose();
   }
 
@@ -287,7 +322,7 @@ class _ReportsScreen extends State<ReportsScreen> {
 
   //Search Sale By Date
   Future<void> _searchSalesByDate(DateTime start, DateTime end) async {
-    if (_selectedStationId == null) {
+    if (_selectedStationIds.isEmpty) {
       _showStationRequiredSnackBar();
       return;
     }
@@ -305,108 +340,77 @@ class _ReportsScreen extends State<ReportsScreen> {
     _salesData.clear();
 
     try {
-      if (_selectedStationId == 'ALL') {
-        // Initialize station progress list
-        final targetStations = _stations
-            .where((s) => s['station_id'] != 'ALL')
-            .toList();
-        List<Map<String, dynamic>> progressList = targetStations
-            .map(
-              (s) => {
-                'station_id': s['station_id'],
-                'name': s['name'],
-                'status': 'pending', // pending, loading, done
-              },
-            )
-            .toList();
+      final List<Map<String, dynamic>> targetStations = _getEffectiveSelectedStations();
+      
+      // Initialize station progress list
+      List<Map<String, dynamic>> progressList = targetStations
+          .map(
+            (s) => {
+              'station_id': s['station_id'],
+              'name': s['name'],
+              'status': 'pending', // pending, loading, done
+            },
+          )
+          .toList();
 
-        for (int i = 0; i < targetStations.length; i++) {
-          final sId = targetStations[i]['station_id'];
-          final sName = targetStations[i]['name'];
+      for (int i = 0; i < targetStations.length; i++) {
+        final sId = targetStations[i]['station_id'];
+        final sName = targetStations[i]['name'];
 
-          // Update status to loading
-          progressList[i]['status'] = 'loading';
-          salesStreamController.add(
-            SalesLoadStatus(
-              data: _salesData,
-              progress: i / targetStations.length,
-              isLoading: true,
-              stationProgress: progressList,
-            ),
-          );
-
-          // API Call for this station
-          final stationUrl =
-              '${AppConfig.apiUrl}/api/sales/search?startDate=$startStr&endDate=$endStr&stationId=$sId';
-
-          final originalId = AppConfig.stationId;
-          final originalDb = AppConfig.database;
-          AppConfig.stationId = sId;
-          AppConfig.database = sId;
-
-          List<dynamic> stationSales = [];
-          await fetchWithProgress(
-            stationUrl,
-            stationSales,
-            salesStreamController,
+        // Update status to loading
+        progressList[i]['status'] = 'loading';
+        salesStreamController.add(
+          SalesLoadStatus(
+            data: _salesData,
+            progress: i / targetStations.length,
+            isLoading: true,
             stationProgress: progressList,
-            stayLoading: i < targetStations.length - 1,
-          );
+          ),
+        );
 
-          AppConfig.stationId = originalId;
-          AppConfig.database = originalDb;
+        // API Call for this station
+        final stationUrl =
+            '${AppConfig.apiUrl}/api/sales/search?startDate=$startStr&endDate=$endStr&stationId=$sId';
 
-          for (var sale in stationSales) {
-            sale['station_id'] = sId;
-            sale['station_name'] = sName;
-            // Normalize Date to Local for sorting and display
-            if (sale['S_Date'] != null) {
-              sale['S_Date'] = _parseServerDateTime(sale['S_Date']).toString();
-            }
-          }
-
-          _salesData.addAll(stationSales);
-
-          // Update status to done
-          progressList[i]['status'] = 'done';
-
-          salesStreamController.add(
-            SalesLoadStatus(
-              data: _salesData,
-              progress: (i + 1) / targetStations.length,
-              isLoading: i < targetStations.length - 1,
-              stationProgress: progressList,
-            ),
-          );
-        }
-      } else {
-        // Specific station
-        final url =
-            '${AppConfig.apiUrl}/api/sales/search?startDate=$startStr&endDate=$endStr&stationId=$_selectedStationId';
         final originalId = AppConfig.stationId;
         final originalDb = AppConfig.database;
-        AppConfig.stationId = _selectedStationId!;
-        AppConfig.database = _selectedStationId!;
+        AppConfig.stationId = sId;
+        AppConfig.database = sId;
 
-        await fetchWithProgress(url, _salesData, salesStreamController);
+        List<dynamic> stationSales = [];
+        await fetchWithProgress(
+          stationUrl,
+          stationSales,
+          salesStreamController,
+          stationProgress: progressList,
+          stayLoading: i < targetStations.length - 1,
+        );
 
-        // Add station info and normalize dates
-        final sName = _stations.firstWhere(
-          (s) => s['station_id'] == _selectedStationId,
-        )['name'];
-        for (var sale in _salesData) {
-          sale['station_id'] = _selectedStationId;
+        AppConfig.stationId = originalId;
+        AppConfig.database = originalDb;
+
+        for (var sale in stationSales) {
+          sale['station_id'] = sId;
           sale['station_name'] = sName;
+          // Normalize Date to Local for sorting and display
           if (sale['S_Date'] != null) {
-            // We need to be careful as _salesData might have been populated by fetchWithProgress
-            // already. But here _salesData was empty before fetchWithProgress in this branch.
-            // Actually _salesData.clear() was called @ 272.
             sale['S_Date'] = _parseServerDateTime(sale['S_Date']).toString();
           }
         }
 
-        AppConfig.stationId = originalId;
-        AppConfig.database = originalDb;
+        _salesData.addAll(stationSales);
+
+        // Update status to done
+        progressList[i]['status'] = 'done';
+
+        salesStreamController.add(
+          SalesLoadStatus(
+            data: _salesData,
+            progress: (i + 1) / targetStations.length,
+            isLoading: i < targetStations.length - 1,
+            stationProgress: progressList,
+          ),
+        );
       }
 
       // Sync System Control Logs as well
@@ -418,7 +422,7 @@ class _ReportsScreen extends State<ReportsScreen> {
 
   // Sidebar (System Control Logs) အတွက် Data Fetching
   Future<void> _fetchSysControlByRange(DateTime start, DateTime end) async {
-    if (_selectedStationId == null) return;
+    if (_selectedStationIds.isEmpty) return;
     setState(() => isLoadingSidebar = true);
     _sysControlList.clear();
 
@@ -427,61 +431,28 @@ class _ReportsScreen extends State<ReportsScreen> {
     final String endStr = DateFormat('yyyy-MM-dd HH:mm:ss').format(end);
 
     try {
-      if (_selectedStationId == 'ALL') {
-        final targetStations = _stations
-            .where((s) => s['station_id'] != 'ALL')
-            .toList();
-        for (var station in targetStations) {
-          final sId = station['station_id'];
-          final sName = station['name'];
+      final targetStations = _getEffectiveSelectedStations();
+      for (var station in targetStations) {
+        final sId = station['station_id'];
+        final sName = station['name'];
 
-          final url = Uri.parse(
-            '${AppConfig.apiUrl}/api/system-control/search?start=$startStr&end=$endStr&stationId=$sId',
-          );
-
-          final originalId = AppConfig.stationId;
-          final originalDb = AppConfig.database;
-          AppConfig.stationId = sId;
-          AppConfig.database = sId;
-
-          final response = await http.get(url, headers: AppConfig.headers);
-          AppConfig.stationId = originalId;
-          AppConfig.database = originalDb;
-
-          if (response.statusCode == 200) {
-            final List<dynamic> data = json.decode(response.body);
-            for (var item in data) {
-              item['station_id'] = sId;
-              item['station_name'] = sName;
-              if (item['Sdate'] != null) {
-                item['Sdate'] = _parseServerDateTime(
-                  item['Sdate'].toString(),
-                ).toString();
-              }
-            }
-            _sysControlList.addAll(data);
-          }
-        }
-        setState(() {});
-      } else {
         final url = Uri.parse(
-          '${AppConfig.apiUrl}/api/system-control/search?start=$startStr&end=$endStr&stationId=$_selectedStationId',
+          '${AppConfig.apiUrl}/api/system-control/search?start=$startStr&end=$endStr&stationId=$sId',
         );
+
         final originalId = AppConfig.stationId;
         final originalDb = AppConfig.database;
-        AppConfig.stationId = _selectedStationId!;
-        AppConfig.database = _selectedStationId!;
+        AppConfig.stationId = sId;
+        AppConfig.database = sId;
+
         final response = await http.get(url, headers: AppConfig.headers);
         AppConfig.stationId = originalId;
         AppConfig.database = originalDb;
 
         if (response.statusCode == 200) {
           final List<dynamic> data = json.decode(response.body);
-          final sName = _stations.firstWhere(
-            (s) => s['station_id'] == _selectedStationId,
-          )['name'];
           for (var item in data) {
-            item['station_id'] = _selectedStationId;
+            item['station_id'] = sId;
             item['station_name'] = sName;
             if (item['Sdate'] != null) {
               item['Sdate'] = _parseServerDateTime(
@@ -489,11 +460,10 @@ class _ReportsScreen extends State<ReportsScreen> {
               ).toString();
             }
           }
-          setState(() {
-            _sysControlList = data;
-          });
+          _sysControlList.addAll(data);
         }
       }
+      setState(() {});
     } catch (e) {
       debugPrint("Sidebar Error: $e");
     } finally {
@@ -563,43 +533,42 @@ class _ReportsScreen extends State<ReportsScreen> {
 
   // နောက်ဆုံး Sale ၂၀ ကို API မှ ဆွဲယူခြင်း
   Future<void> _fetchLatestSales() async {
-    if (_selectedStationId == null) {
+    if (_selectedStationIds.isEmpty) {
       _showStationRequiredSnackBar();
       return;
     }
 
-    final dynamicUrl = '$apiUrl?stationId=$_selectedStationId';
-
-    // စတင်ချိန်မှာ Loading True နဲ့ 0% ပို့လိုက်မယ်
-    salesStreamController.add(
-      SalesLoadStatus(data: [], progress: 0.0, isLoading: true),
-    );
-
-    final originalId = AppConfig.stationId;
-    final originalDb = AppConfig.database;
-    AppConfig.stationId = _selectedStationId!;
-    AppConfig.database = _selectedStationId!;
+    final targetStations = _getEffectiveSelectedStations();
 
     try {
-      final List<dynamic> latestSales = [];
-      await fetchWithProgress(dynamicUrl, latestSales, salesStreamController);
-
-      // Normalize dates and add station info
-      for (var sale in latestSales) {
-        if (sale['S_Date'] != null) {
-          sale['S_Date'] = _parseServerDateTime(sale['S_Date']).toString();
-        }
-        sale['station_id'] = _selectedStationId;
-        sale['station_name'] = AppConfig.stationName;
-      }
-
       _salesData.clear();
-      _salesData.addAll(latestSales);
+      for (var station in targetStations) {
+        final sId = station['station_id'];
+        final dynamicUrl = '$apiUrl?stationId=$sId';
+
+        final originalId = AppConfig.stationId;
+        final originalDb = AppConfig.database;
+        AppConfig.stationId = sId;
+        AppConfig.database = sId;
+
+        final List<dynamic> stationLatestSales = [];
+        await fetchWithProgress(dynamicUrl, stationLatestSales, salesStreamController);
+
+        // Normalize dates and add station info
+        for (var sale in stationLatestSales) {
+          if (sale['S_Date'] != null) {
+            sale['S_Date'] = _parseServerDateTime(sale['S_Date']).toString();
+          }
+          sale['station_id'] = sId;
+          sale['station_name'] = station['name'];
+        }
+        _salesData.addAll(stationLatestSales);
+
+        AppConfig.stationId = originalId;
+        AppConfig.database = originalDb;
+      }
     } catch (e) {
       debugPrint("Fetch Error: $e");
-    } finally {
-      AppConfig.stationId = originalId;
-      AppConfig.database = originalDb;
     }
   }
 
@@ -620,49 +589,13 @@ class _ReportsScreen extends State<ReportsScreen> {
               snapshot.data ??
               SalesLoadStatus(data: [], progress: 0.0, isLoading: false);
 
-          final isMobile = MediaQuery.of(context).size.width < 1000;
+          final isMobile = MediaQuery.of(context).size.width < 1100;
 
           return Stack(
             children: [
               isMobile
-                  ? ListView(
-                      children: [
-                        _buildDateSearchRow(isMobile, status.data),
-                        if (_selectedStationId != null) ...[
-                          SummaryView(
-                            saleSummaryTable: _buildTypeSummaryTable(isMobile),
-                            fuelSummaryTable: _buildFuelSummaryTable(isMobile),
-                            stationSummaryTable: _selectedStationId == 'ALL'
-                                ? _buildStationSummaryTable(isMobile)
-                                : null,
-                          ),
-                          _buildHeaderInfo(isMobile),
-                          _salesData.isEmpty
-                              ? _buildEmptyState()
-                              : _buildShowDetailButton(status.data),
-                        ] else
-                          _buildInitialSelectStationState(),
-                      ],
-                    )
-                  : Column(
-                      children: [
-                        _buildDateSearchRow(isMobile, status.data),
-                        if (_selectedStationId != null) ...[
-                          SummaryView(
-                            saleSummaryTable: _buildTypeSummaryTable(isMobile),
-                            fuelSummaryTable: _buildFuelSummaryTable(isMobile),
-                            stationSummaryTable: _selectedStationId == 'ALL'
-                                ? _buildStationSummaryTable(isMobile)
-                                : null,
-                          ),
-                          _buildHeaderInfo(isMobile),
-                          _salesData.isEmpty
-                              ? _buildEmptyState()
-                              : _buildShowDetailButton(status.data),
-                        ] else
-                          Expanded(child: _buildInitialSelectStationState()),
-                      ],
-                    ),
+                  ? _buildMobileView(status)
+                  : _buildDesktopView(status),
               Visibility(
                 visible: status.isLoading,
                 child: ProgressOverlay(
@@ -674,6 +607,66 @@ class _ReportsScreen extends State<ReportsScreen> {
             ],
           );
         },
+      ),
+    );
+  }
+
+  // --- Layout Views ---
+
+  Widget _buildMobileView(SalesLoadStatus status) {
+    const bool isMobile = true;
+    return ListView(
+      children: [
+        _buildDateSearchRow(isMobile, status.data),
+        if (_selectedStationIds.isNotEmpty) ...[
+          SummaryView(
+            saleSummaryTable: _buildTypeSummaryTable(isMobile),
+            fuelSummaryTable: _buildFuelSummaryTable(isMobile),
+            stationSummaryTable:
+                (_selectedStationIds.contains('ALL') ||
+                        _selectedStationIds.length > 1)
+                    ? _buildStationSummaryTable(isMobile)
+                    : null,
+          ),
+          _buildHeaderInfo(isMobile),
+          _salesData.isEmpty
+              ? _buildEmptyState()
+              : _buildShowDetailButton(status.data),
+        ] else
+          _buildInitialSelectStationState(),
+      ],
+    );
+  }
+
+  Widget _buildDesktopView(SalesLoadStatus status) {
+    const bool isMobile = false;
+    return Center(
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 1400),
+        child: ListView(
+          padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
+          children: [
+            _buildDateSearchRow(isMobile, status.data),
+            if (_selectedStationIds.isNotEmpty) ...[
+              SummaryView(
+                saleSummaryTable: _buildTypeSummaryTable(isMobile),
+                fuelSummaryTable: _buildFuelSummaryTable(isMobile),
+                stationSummaryTable:
+                    (_selectedStationIds.contains('ALL') ||
+                            _selectedStationIds.length > 1)
+                        ? _buildStationSummaryTable(isMobile)
+                        : null,
+              ),
+              const SizedBox(height: 10),
+              _buildHeaderInfo(isMobile),
+              const SizedBox(height: 20),
+              _salesData.isEmpty
+                  ? _buildEmptyState()
+                  : _buildShowDetailButton(status.data),
+            ] else
+              _buildInitialSelectStationState(),
+          ],
+        ),
       ),
     );
   }
@@ -692,10 +685,10 @@ class _ReportsScreen extends State<ReportsScreen> {
       padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 15),
       decoration: BoxDecoration(
         color: (isDark ? StyleConstants.darkBg : Colors.blueGrey.shade50)
-            .withOpacity(0.5),
+            .withValues(alpha: 0.5),
         border: Border(
           bottom: BorderSide(
-            color: (isDark ? Colors.white : Colors.black).withOpacity(0.05),
+            color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.05),
           ),
         ),
       ),
@@ -968,7 +961,7 @@ class _ReportsScreen extends State<ReportsScreen> {
             Icon(
               Icons.list_alt_rounded,
               size: 64,
-              color: Colors.teal.withOpacity(0.5),
+              color: Colors.teal.withValues(alpha: 0.5),
             ),
             const SizedBox(height: 16),
             Text(
@@ -1043,7 +1036,7 @@ class _ReportsScreen extends State<ReportsScreen> {
             Icon(
               Icons.location_on_outlined,
               size: 80,
-              color: Colors.teal.withOpacity(0.5),
+              color: Colors.teal.withValues(alpha: 0.5),
             ),
             const SizedBox(height: 24),
             const Text(
@@ -1083,6 +1076,19 @@ class _ReportsScreen extends State<ReportsScreen> {
     if (fuelName.contains('Diesel')) return Colors.green;
     if (fuelName.contains('Premium')) return Colors.blue;
     return Colors.blueGrey;
+  }
+
+  IconData getCategoryIcon(String category) {
+    final cat = category.toLowerCase();
+    if (cat.contains('cycle') || cat.contains('bike')) return Icons.motorcycle;
+    if (cat.contains('car') || cat.contains('passenger') || cat.contains('taxi')) return Icons.directions_car;
+    if (cat.contains('truck') || cat.contains('lorry')) return Icons.local_shipping;
+    if (cat.contains('bus')) return Icons.directions_bus;
+    if (cat.contains('machinery') || cat.contains('tractor')) return Icons.construction;
+    if (cat.contains('tanker')) return Icons.oil_barrel;
+    if (cat.contains('company')) return Icons.business;
+    if (cat.contains('factory')) return Icons.factory;
+    return Icons.category_outlined;
   }
 
   // Sidebar Widget
@@ -1522,6 +1528,31 @@ class _ReportsScreen extends State<ReportsScreen> {
               ],
             ),
           ),
+          const SizedBox(height: 12),
+          // Search Filters Row
+          Row(
+            children: [
+              Expanded(
+                child: _buildSearchField(
+                  controller: _voucherSearchController,
+                  hint: "Search Voucher No",
+                  icon: Icons.receipt_long_rounded,
+                  onChanged: (val) => setState(() => _searchVoucher = val),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: _buildSearchField(
+                  controller: _vehicleSearchController,
+                  hint: "Search Vehicle No",
+                  icon: Icons.directions_car_rounded,
+                  onChanged: (val) => setState(() => _searchVehicle = val),
+                ),
+              ),
+              const SizedBox(width: 16),
+              // Filter status summary or counts can go here if needed
+            ],
+          ),
           const SizedBox(height: 10),
           Row(
             children: [
@@ -1537,6 +1568,8 @@ class _ReportsScreen extends State<ReportsScreen> {
                       setState(() {
                         _searchVoucher = "";
                         _searchVehicle = "";
+                        _voucherSearchController.clear();
+                        _vehicleSearchController.clear();
                         _filterFuelType = "ALL";
                         _filterSaleType = "ALL";
                       });
@@ -1641,6 +1674,25 @@ class _ReportsScreen extends State<ReportsScreen> {
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
+                _buildSearchField(
+                  controller: _voucherSearchController,
+                  hint: "Search Voucher No",
+                  icon: Icons.receipt_long_rounded,
+                  onChanged: (val) => setState(() => _searchVoucher = val),
+                  isMobile: true,
+                ),
+                const SizedBox(height: 12),
+                _buildSearchField(
+                  controller: _vehicleSearchController,
+                  hint: "Search Vehicle No",
+                  icon: Icons.directions_car_rounded,
+                  onChanged: (val) => setState(() => _searchVehicle = val),
+                  isMobile: true,
+                ),
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Divider(),
+                ),
                 _buildDateTimeSegment(
                   title: "START",
                   dateController: _startDateController,
@@ -1754,52 +1806,216 @@ class _ReportsScreen extends State<ReportsScreen> {
     );
   }
 
+  void _showStationSelectionDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text("Select Stations"),
+              content: SizedBox(
+                width: 400,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        TextButton(
+                          onPressed: () {
+                            setDialogState(() {
+                              _selectedStationIds = ['ALL'];
+                            });
+                          },
+                          child: const Text("Select ALL"),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            setDialogState(() {
+                              _selectedStationIds = [];
+                            });
+                          },
+                          child: const Text("Clear All"),
+                        ),
+                      ],
+                    ),
+                    const Divider(),
+                    Flexible(
+                      child: ListView(
+                        shrinkWrap: true,
+                        children: [
+                          // 1. ALL STATIONS (if exists)
+                          ..._stations
+                              .where((s) => s['station_id'] == 'ALL')
+                              .map((station) {
+                            final sId = station['station_id'].toString();
+                            final sName = station['name'] ?? '';
+                            bool isAllSelected =
+                                _selectedStationIds.contains('ALL');
+
+                            return CheckboxListTile(
+                              title: Text(sName,
+                                  style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold)),
+                              value: isAllSelected,
+                              onChanged: (val) {
+                                setDialogState(() {
+                                  _selectedStationIds = val == true ? ['ALL'] : [];
+                                });
+                              },
+                            );
+                          }),
+
+                          const Divider(),
+
+                          // 2. Grouped by Region
+                          ..._groupStationsByRegion().entries.map((entry) {
+                            final regionName = entry.key;
+                            final regionStations = entry.value;
+                            
+                            // Check if ALL stations in this region are selected
+                            final regionStationIds = regionStations.map((s) => s['station_id'].toString()).toList();
+                            bool isRegionFullySelected = regionStationIds.isNotEmpty && 
+                                regionStationIds.every((id) => _selectedStationIds.contains(id));
+
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Region Header with Toggle
+                                CheckboxListTile(
+                                  title: Text(
+                                    regionName.toUpperCase(),
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.teal[700],
+                                      letterSpacing: 1.0,
+                                    ),
+                                  ),
+                                  value: isRegionFullySelected,
+                                  activeColor: Colors.teal,
+                                  dense: true,
+                                  onChanged: (val) {
+                                    setDialogState(() {
+                                      _selectedStationIds.remove('ALL');
+                                      if (val == true) {
+                                        // Select all in region
+                                        for (var id in regionStationIds) {
+                                          if (!_selectedStationIds.contains(id)) {
+                                            _selectedStationIds.add(id);
+                                          }
+                                        }
+                                      } else {
+                                        // Deselect all in region
+                                        _selectedStationIds.removeWhere((id) => regionStationIds.contains(id));
+                                      }
+                                    });
+                                  },
+                                ),
+                                
+                                // Individual Stations (Indented)
+                                ...regionStations.map((station) {
+                                  final sName = station['name'] ?? '';
+                                  final String sIdStr = station['station_id'].toString();
+                                  bool isSelected = _selectedStationIds.contains(sIdStr);
+
+                                  return Padding(
+                                    padding: const EdgeInsets.only(left: 24.0),
+                                    child: CheckboxListTile(
+                                      title: Text(sName, style: const TextStyle(fontSize: 13)),
+                                      value: isSelected,
+                                      dense: true,
+                                      onChanged: (val) {
+                                        setDialogState(() {
+                                          _selectedStationIds.remove('ALL');
+                                          if (val == true) {
+                                            _selectedStationIds.add(sIdStr);
+                                          } else {
+                                            _selectedStationIds.remove(sIdStr);
+                                          }
+                                        });
+                                      },
+                                    ),
+                                  );
+                                }),
+                                const Divider(height: 1),
+                              ],
+                            );
+                          }),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text("Cancel"),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    setState(() {});
+                  },
+                  child: const Text("Apply Selection"),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   Widget _buildStationSelector(bool isMobile) {
-    return Container(
-      width: isMobile ? double.infinity : 250,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      margin: isMobile ? const EdgeInsets.only(bottom: 16) : EdgeInsets.zero,
-      decoration: BoxDecoration(
-        color: Theme.of(context).brightness == Brightness.dark
-            ? Colors.white10
-            : Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey.withOpacity(0.3)),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: _selectedStationId,
-          isExpanded: true,
-          icon: const Icon(Icons.location_on, color: Colors.teal),
-          items: _stations.map((station) {
-            return DropdownMenuItem<String>(
-              value: station['station_id'],
+    String displayText = "Select Station";
+    if (_selectedStationIds.contains('ALL')) {
+      displayText = "ALL STATIONS";
+    } else if (_selectedStationIds.isNotEmpty) {
+      if (_selectedStationIds.length == 1) {
+        displayText = _stations.firstWhere(
+          (s) => s['station_id'] == _selectedStationIds.first,
+          orElse: () => {'name': 'Selected'},
+        )['name'];
+      } else {
+        displayText = "${_selectedStationIds.length} Stations Selected";
+      }
+    }
+
+    return InkWell(
+      onTap: _showStationSelectionDialog,
+      child: Container(
+        width: isMobile ? double.infinity : 250,
+        height: 48,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        margin: isMobile ? const EdgeInsets.only(bottom: 16) : EdgeInsets.zero,
+        decoration: BoxDecoration(
+          color: Theme.of(context).brightness == Brightness.dark
+              ? Colors.white10
+              : Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.teal.withOpacity(0.3)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.location_on, color: Colors.teal, size: 18),
+            const SizedBox(width: 8),
+            Expanded(
               child: Text(
-                station['name'] ?? '',
+                displayText,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                  fontSize: 14,
+                  fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),
               ),
-            );
-          }).toList(),
-          onChanged: (value) {
-            setState(() {
-              _selectedStationId = value;
-            });
-            if (value != null) {
-              final start = _combineDateAndTime(
-                _selectedDateRange!.start,
-                _startTimeController.text,
-              );
-              final end = _combineDateAndTime(
-                _selectedDateRange!.end,
-                _endTimeController.text,
-              );
-              _fetchInitialData(start, end);
-              _fetchSysControlByRange(start, end);
-            }
-          },
+            ),
+            const Icon(Icons.arrow_drop_down, color: Colors.grey),
+          ],
         ),
       ),
     );
@@ -2021,21 +2237,24 @@ class _ReportsScreen extends State<ReportsScreen> {
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          SizedBox(
-                            height: 25,
-                            child: TextField(
-                              controller: timeController,
-                              style: const TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 0.5,
+                          InkWell(
+                            onTap: () => _pickTimeForController(timeController),
+                            child: SizedBox(
+                              height: 25,
+                              child: TextField(
+                                controller: timeController,
+                                enabled: false,
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.5,
+                                ),
+                                decoration: const InputDecoration(
+                                  isDense: true,
+                                  border: InputBorder.none,
+                                  contentPadding: EdgeInsets.zero,
+                                ),
                               ),
-                              decoration: const InputDecoration(
-                                isDense: true,
-                                border: InputBorder.none,
-                                contentPadding: EdgeInsets.zero,
-                              ),
-                              keyboardType: TextInputType.number,
                             ),
                           ),
                         ],
@@ -2082,8 +2301,23 @@ class _ReportsScreen extends State<ReportsScreen> {
     }
   }
 
+  Future<void> _pickTimeForController(TextEditingController controller) async {
+    final TimeOfDay? picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(
+        DateFormat("HH:mm:ss").parse(controller.text),
+      ),
+    );
+    if (picked != null) {
+      setState(() {
+        controller.text =
+            "${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}:00";
+      });
+    }
+  }
+
   Future<void> _exportDetail() async {
-    if (_selectedStationId == null) {
+    if (_selectedStationIds.isEmpty) {
       _showStationRequiredSnackBar();
       return;
     }
@@ -2100,13 +2334,18 @@ class _ReportsScreen extends State<ReportsScreen> {
   }
 
   void _exportSummary() {
-    if (_selectedStationId == null) {
+    if (_selectedStationIds.isEmpty) {
       _showStationRequiredSnackBar();
       return;
     }
+    
+    final stName = _selectedStationIds.contains('ALL') 
+        ? "ALL STATIONS"
+        : _getEffectiveSelectedStations().map((e) => e['name']).join(", ");
+
     exportSaleDataReport(
       _salesData.toList(),
-      AppConfig.stationName,
+      stName,
       "${DateFormat('dd-MM-yyyy').format(_selectedDateRange!.start)} ${_startTimeController.text}",
       "${DateFormat('dd-MM-yyyy').format(_selectedDateRange!.end)} ${_endTimeController.text}",
     );
@@ -2138,6 +2377,45 @@ class _ReportsScreen extends State<ReportsScreen> {
         ),
         _infoRow("Record", "${data.length}"),
       ],
+    );
+  }
+
+  Widget _buildSearchField({
+    required TextEditingController controller,
+    required String hint,
+    required IconData icon,
+    required Function(String) onChanged,
+    bool isMobile = false,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      height: isMobile ? 50 : 45,
+      decoration: BoxDecoration(
+        color: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.02),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: (isDark ? Colors.white : Colors.black).withOpacity(0.1)),
+      ),
+      child: TextField(
+        controller: controller,
+        onChanged: onChanged,
+        style: const TextStyle(fontSize: 14),
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: TextStyle(color: isDark ? Colors.white38 : Colors.black38, fontSize: 13),
+          prefixIcon: Icon(icon, size: 18, color: Colors.teal),
+          suffixIcon: controller.text.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(Icons.clear, size: 16),
+                  onPressed: () {
+                    controller.clear();
+                    onChanged("");
+                  },
+                )
+              : null,
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(vertical: 12),
+        ),
+      ),
     );
   }
 

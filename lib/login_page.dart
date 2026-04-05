@@ -65,6 +65,7 @@ class _LoginPageState extends State<LoginPage> {
               'User ${AppConfig.currentUserName} logged in at ${AppConfig.stationName}',
         );
 
+        if (!mounted) return;
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (context) => const AppLauncherScreen()),
           (route) => false,
@@ -280,7 +281,7 @@ class _LoginPageState extends State<LoginPage> {
               )
             : null,
         filled: true,
-        fillColor: (isDark ? Colors.white : Colors.black).withOpacity(0.05),
+        fillColor: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.05),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide.none,

@@ -10,6 +10,8 @@ Widget buildCardBadge(String text, Color color) {
     ),
     child: Text(
       text,
+      overflow: TextOverflow.ellipsis,
+      maxLines: 1,
       style: TextStyle(
         color: color, // စာသားကို အရောင်တောက်တောက်
         fontWeight: FontWeight.bold,

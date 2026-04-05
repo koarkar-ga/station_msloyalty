@@ -119,6 +119,7 @@ class _SplashScreenState extends State<SplashScreen> {
       } catch (e) {}
 
       if (mounted) setState(() => _loadingStatus = "Checking for Updates...");
+      if (!mounted) return;
       await UpdateService().checkForUpdates(context);
 
       if (mounted) setState(() => _loadingStatus = "Launching Station App...");
@@ -131,6 +132,7 @@ class _SplashScreenState extends State<SplashScreen> {
         (route) => false,
       );
     } catch (e) {
+      if (!mounted) return;
       _showErrorDialog(context, e.toString());
     }
   }
@@ -186,7 +188,7 @@ class _SplashScreenState extends State<SplashScreen> {
               SizedBox(
                 width: 200,
                 child: LinearProgressIndicator(
-                  backgroundColor: Colors.white.withOpacity(0.05),
+                  backgroundColor: Colors.white.withValues(alpha: 0.05),
                   color: const Color(0xFF38BDF8),
                   minHeight: 2,
                 ),

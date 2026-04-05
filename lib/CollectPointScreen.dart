@@ -171,7 +171,7 @@ class _CollectPointScreenState extends State<CollectPointScreen> {
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.2),
+                  color: Colors.black.withValues(alpha: 0.2),
                   blurRadius: 4,
                   offset: const Offset(0, 2),
                 ),
@@ -365,9 +365,9 @@ class _CollectPointScreenState extends State<CollectPointScreen> {
                                                 : null,
                                             filled: true,
                                             fillColor: isDark
-                                                ? Colors.white.withOpacity(0.05)
-                                                : Colors.black.withOpacity(
-                                                    0.05,
+                                                ? Colors.white.withValues(alpha: 0.05)
+                                                : Colors.black.withValues(
+                                                    alpha: 0.05,
                                                   ),
                                             border: OutlineInputBorder(
                                               borderRadius:
@@ -855,10 +855,10 @@ class _CollectPointScreenState extends State<CollectPointScreen> {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: getSaleTypeColor(saleTypeName).withOpacity(0.2),
+                    color: getSaleTypeColor(saleTypeName).withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color: getSaleTypeColor(saleTypeName).withOpacity(0.5),
+                      color: getSaleTypeColor(saleTypeName).withValues(alpha: 0.5),
                     ),
                   ),
                   child: Text(

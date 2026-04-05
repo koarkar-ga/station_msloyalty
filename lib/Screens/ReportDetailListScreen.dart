@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:station_msloyalty/Constants/StyleConstants.dart';
 import 'package:station_msloyalty/Screens/CheckAlreadyCollectedReport.dart';
 import 'package:station_msloyalty/Helper/DataCell.dart';
+import 'package:station_msloyalty/Screens/DuplicateAnalysisScreen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ReportDetailListScreen extends StatefulWidget {
@@ -22,24 +23,46 @@ class ReportDetailListScreen extends StatefulWidget {
 class _ReportDetailListScreenState extends State<ReportDetailListScreen> {
   late List<dynamic> _filteredData;
   final TextEditingController _searchController = TextEditingController();
+  final TextEditingController _minLiterController = TextEditingController();
+  final TextEditingController _maxLiterController = TextEditingController();
   String _selectedFuelType = 'All';
   String _selectedCategory = 'All';
   String _sortBy = 'Time'; // 'Time', 'Liter', 'Amount'
   bool _isAscending = false;
+  bool _showOnlyDuplicates = false;
+  Set<String> _duplicateVehicles = {};
 
   @override
   void initState() {
     super.initState();
+    _calculateDuplicates();
     _filteredData = List.from(widget.salesData);
     _applyFilters();
+  }
+
+  void _calculateDuplicates() {
+    final Map<String, int> counts = {};
+    for (var sale in widget.salesData) {
+      final veh = (sale['Vehical_No'] ?? '').toString().trim();
+      if (veh.isEmpty || veh == '-') continue;
+      counts[veh] = (counts[veh] ?? 0) + 1;
+    }
+    _duplicateVehicles = counts.entries
+        .where((e) => e.value > 1)
+        .map((e) => e.key)
+        .toSet();
   }
 
   void _applyFilters() {
     setState(() {
       _filteredData = widget.salesData.where((sale) {
-        final vocNo = sale['VocNo'].toString().toLowerCase();
         final searchText = _searchController.text.toLowerCase();
-        final matchesSearch = vocNo.contains(searchText);
+        
+        final vocNo = sale['VocNo'].toString().toLowerCase();
+        final vehNoRaw = (sale['Vehical_No'] ?? '').toString();
+        final vehNo = vehNoRaw.toLowerCase();
+        
+        final matchesSearch = vocNo.contains(searchText) || vehNo.contains(searchText);
 
         final fuelType = sale['FuelTypeName'] ?? '';
         final matchesFuel =
@@ -49,7 +72,19 @@ class _ReportDetailListScreenState extends State<ReportDetailListScreen> {
         final matchesCategory =
             _selectedCategory == 'All' || category == _selectedCategory;
 
-        return matchesSearch && matchesFuel && matchesCategory;
+        // Liter Range Filter
+        final literValue = double.tryParse(sale['SALELITER']?.toString() ?? '0') ?? 0;
+        final minLiter = double.tryParse(_minLiterController.text) ?? 0;
+        final maxText = _maxLiterController.text.trim();
+        final maxLiter = maxText.isEmpty ? double.infinity : (double.tryParse(maxText) ?? double.infinity);
+        
+        final matchesLiterRange = literValue >= minLiter && literValue <= maxLiter;
+
+        // Duplicate Filter
+        final isDuplicate = _duplicateVehicles.contains(vehNoRaw.trim());
+        final matchesDuplicate = !_showOnlyDuplicates || isDuplicate;
+
+        return matchesSearch && matchesFuel && matchesCategory && matchesLiterRange && matchesDuplicate;
       }).toList();
 
       // Apply Sorting
@@ -113,6 +148,18 @@ class _ReportDetailListScreenState extends State<ReportDetailListScreen> {
             icon: Icon(_isAscending ? Icons.south : Icons.north, size: 20),
             tooltip: "Toggle Sort Order",
           ),
+          IconButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => DuplicateAnalysisScreen(salesData: widget.salesData),
+                ),
+              );
+            },
+            icon: const Icon(Icons.analytics_outlined),
+            tooltip: "Analyze Duplicates",
+          ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.sort),
             onSelected: (value) {
@@ -144,7 +191,7 @@ class _ReportDetailListScreenState extends State<ReportDetailListScreen> {
                   controller: _searchController,
                   onChanged: (_) => _applyFilters(),
                   decoration: InputDecoration(
-                    hintText: "Search Voucher No...",
+                    hintText: "Search Voucher No or Vehicle No...",
                     prefixIcon: const Icon(Icons.search, size: 20),
                     suffixIcon: _searchController.text.isNotEmpty
                         ? IconButton(
@@ -157,7 +204,7 @@ class _ReportDetailListScreenState extends State<ReportDetailListScreen> {
                         : null,
                     filled: true,
                     fillColor: isDark
-                        ? Colors.white.withOpacity(0.05)
+                        ? Colors.white.withValues(alpha: 0.05)
                         : Colors.grey[100],
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -189,7 +236,7 @@ class _ReportDetailListScreenState extends State<ReportDetailListScreen> {
                               _applyFilters();
                             });
                           },
-                          selectedColor: getFuelColor(type).withOpacity(0.2),
+                          selectedColor: getFuelColor(type).withValues(alpha: 0.2),
                           checkmarkColor: getFuelColor(type),
                           labelStyle: TextStyle(
                             color: isSelected
@@ -227,6 +274,11 @@ class _ReportDetailListScreenState extends State<ReportDetailListScreen> {
                       return Padding(
                         padding: const EdgeInsets.only(right: 8),
                         child: FilterChip(
+                          avatar: Icon(
+                            getCategoryIcon(cat),
+                            size: 14,
+                            color: isSelected ? Colors.blue : (isDark ? Colors.white54 : Colors.black54),
+                          ),
                           label: Text(cat),
                           selected: isSelected,
                           onSelected: (selected) {
@@ -236,7 +288,7 @@ class _ReportDetailListScreenState extends State<ReportDetailListScreen> {
                             });
                           },
                           backgroundColor: Colors.transparent,
-                          selectedColor: Colors.blue.withOpacity(0.1),
+                          selectedColor: Colors.blue.withValues(alpha: 0.1),
                           checkmarkColor: Colors.blue,
                           labelStyle: TextStyle(
                             color: isSelected
@@ -251,13 +303,73 @@ class _ReportDetailListScreenState extends State<ReportDetailListScreen> {
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(16),
                             side: BorderSide(
-                              color: isSelected ? Colors.blue : Colors.grey.withOpacity(0.3),
+                              color: isSelected ? Colors.blue : Colors.grey.withValues(alpha: 0.3),
                             ),
                           ),
                         ),
                       );
                     },
                   ),
+                ),
+                const SizedBox(height: 12),
+                // Liter Range and Duplicates Row
+                Row(
+                  children: [
+                    // Min Liter
+                    Expanded(
+                      flex: 2,
+                      child: _buildRangeInput(
+                        controller: _minLiterController,
+                        hint: "Min Liter",
+                        onChanged: (_) => _applyFilters(),
+                      ),
+                    ),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 8),
+                      child: Text("-", style: TextStyle(color: Colors.grey)),
+                    ),
+                    // Max Liter
+                    Expanded(
+                      flex: 2,
+                      child: _buildRangeInput(
+                        controller: _maxLiterController,
+                        hint: "Max Liter",
+                        onChanged: (_) => _applyFilters(),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // Duplicates Filter Chip
+                    ActionChip(
+                      avatar: Icon(
+                        Icons.copy_rounded,
+                        size: 14,
+                        color: _showOnlyDuplicates ? Colors.white : Colors.orange,
+                      ),
+                      label: Text(
+                        "Duplicates (${_duplicateVehicles.length})",
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: _showOnlyDuplicates ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
+                          fontWeight: _showOnlyDuplicates ? FontWeight.bold : FontWeight.normal,
+                        ),
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _showOnlyDuplicates = !_showOnlyDuplicates;
+                          _applyFilters();
+                        });
+                      },
+                      backgroundColor: _showOnlyDuplicates 
+                        ? Colors.orange 
+                        : (isDark ? Colors.white.withValues(alpha: 0.05) : Colors.grey[100]),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                        side: BorderSide(
+                          color: _showOnlyDuplicates ? Colors.orange : Colors.grey.withValues(alpha: 0.2),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -333,7 +445,7 @@ class _ReportDetailListScreenState extends State<ReportDetailListScreen> {
                 decoration: BoxDecoration(
                   color: headerColor,
                   border: Border.all(
-                    color: (isDark ? Colors.white : Colors.teal).withOpacity(0.2),
+                    color: (isDark ? Colors.white : Colors.teal).withValues(alpha: 0.2),
                   ),
                 ),
                 child: Row(
@@ -369,7 +481,7 @@ class _ReportDetailListScreenState extends State<ReportDetailListScreen> {
                     border: Border(
                       bottom: BorderSide(
                         color: (isDark ? Colors.white : Colors.grey.shade300)
-                            .withOpacity(0.1),
+                            .withValues(alpha: 0.1),
                       ),
                     ),
                   ),
@@ -382,7 +494,33 @@ class _ReportDetailListScreenState extends State<ReportDetailListScreen> {
                         isDark,
                       ),
                       _buildTableCell('${sale['VocNo']}', 2, isDark),
-                      _buildTableCell('${sale['Category'] ?? '-'}', 2, isDark),
+                      _buildTableCell(
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              getCategoryIcon(sale['Category']?.toString() ?? ''),
+                              size: 14,
+                              color: isDark ? Colors.white70 : Colors.blueGrey,
+                            ),
+                            const SizedBox(width: 8),
+                            Flexible(
+                              child: Text(
+                                '${sale['Category'] ?? '-'}',
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: isDark ? Colors.white : StyleConstants.lightText,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        2,
+                        isDark,
+                        isAction: true,
+                      ),
                       dataCell(
                         "${sale['FuelTypeName']}",
                         150,
@@ -501,6 +639,19 @@ class _ReportDetailListScreenState extends State<ReportDetailListScreen> {
         return Colors.blueGrey;
     }
   }
+  
+  IconData getCategoryIcon(String category) {
+    final cat = category.toLowerCase();
+    if (cat.contains('cycle') || cat.contains('bike')) return Icons.motorcycle;
+    if (cat.contains('car') || cat.contains('passenger') || cat.contains('taxi')) return Icons.directions_car;
+    if (cat.contains('truck') || cat.contains('lorry')) return Icons.local_shipping;
+    if (cat.contains('bus')) return Icons.directions_bus;
+    if (cat.contains('machinery') || cat.contains('tractor')) return Icons.construction;
+    if (cat.contains('tanker')) return Icons.oil_barrel;
+    if (cat.contains('company')) return Icons.business;
+    if (cat.contains('factory')) return Icons.factory;
+    return Icons.category_outlined;
+  }
 
   Color getFuelColor(String fuelName) {
     if (fuelName.contains('92')) return Colors.orange;
@@ -530,7 +681,7 @@ class _ReportDetailListScreenState extends State<ReportDetailListScreen> {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.teal.withOpacity(0.1),
+                    color: Colors.teal.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
@@ -562,7 +713,7 @@ class _ReportDetailListScreenState extends State<ReportDetailListScreen> {
               sale['Vehical_No']?.toString() ?? '-',
             ),
             _cardRow(
-              Icons.category_outlined,
+              getCategoryIcon(sale['Category']?.toString() ?? ''),
               "Category",
               sale['Category']?.toString() ?? '-',
             ),
@@ -631,7 +782,7 @@ class _ReportDetailListScreenState extends State<ReportDetailListScreen> {
                   : Container(
                       padding: const EdgeInsets.symmetric(vertical: 8),
                       decoration: BoxDecoration(
-                        color: Colors.grey.withOpacity(0.1),
+                        color: Colors.grey.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: const Center(
@@ -657,9 +808,9 @@ class _ReportDetailListScreenState extends State<ReportDetailListScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Text(
         type ?? '-',
@@ -708,7 +859,7 @@ class _ReportDetailListScreenState extends State<ReportDetailListScreen> {
           Icon(
             Icons.search_off_rounded,
             size: 64,
-            color: Colors.grey.withOpacity(0.5),
+            color: Colors.grey.withValues(alpha: 0.5),
           ),
           const SizedBox(height: 16),
           const Text(
@@ -729,9 +880,40 @@ class _ReportDetailListScreenState extends State<ReportDetailListScreen> {
     );
   }
 
+  Widget _buildRangeInput({
+    required TextEditingController controller,
+    required String hint,
+    required Function(String) onChanged,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return TextField(
+      controller: controller,
+      onChanged: onChanged,
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      style: const TextStyle(fontSize: 12),
+      decoration: InputDecoration(
+        hintText: hint,
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        filled: true,
+        fillColor: isDark ? Colors.white.withValues(alpha: 0.03) : Colors.grey[100],
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: Colors.grey.withValues(alpha: 0.2)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: Colors.grey.withValues(alpha: 0.1)),
+        ),
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _searchController.dispose();
+    _minLiterController.dispose();
+    _maxLiterController.dispose();
     super.dispose();
   }
 }

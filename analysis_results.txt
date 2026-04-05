@@ -1,0 +1,242 @@
+Analyzing station_msloyalty...                                  
+
+   info • The file name 'AppConfig.dart' isn't a lower_case_with_underscores identifier • lib/AppConfig.dart:1:1 • file_names
+   info • Don't invoke 'print' in production code • lib/AppConfig.dart:50:9 • avoid_print
+   info • Don't invoke 'print' in production code • lib/AppConfig.dart:55:9 • avoid_print
+   info • Don't invoke 'print' in production code • lib/AppConfig.dart:61:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/AppConfig.dart:88:9 • avoid_print
+   info • Don't invoke 'print' in production code • lib/AppConfig.dart:102:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/AppConfig.dart:106:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/AppConfig.dart:115:9 • avoid_print
+   info • Don't invoke 'print' in production code • lib/AppConfig.dart:118:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/AppConfig.dart:121:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/AppConfig.dart:155:9 • avoid_print
+   info • Don't invoke 'print' in production code • lib/AppConfig.dart:191:9 • avoid_print
+   info • Don't invoke 'print' in production code • lib/AppConfig.dart:196:7 • avoid_print
+   info • The file name 'CollectPointScreen.dart' isn't a lower_case_with_underscores identifier • lib/CollectPointScreen.dart:1:1 • file_names
+   info • Don't invoke 'print' in production code • lib/CollectPointScreen.dart:133:9 • avoid_print
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/CollectPointScreen.dart:174:39 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/CollectPointScreen.dart:368:64 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/CollectPointScreen.dart:369:64 • deprecated_member_use
+warning • The value of the local variable 'isDark' isn't used • lib/CollectPointScreen.dart:631:11 • unused_local_variable
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/CollectPointScreen.dart:658:59 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/CollectPointScreen.dart:709:59 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/CollectPointScreen.dart:858:59 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/CollectPointScreen.dart:861:61 • deprecated_member_use
+   info • The file name 'StyleConstants.dart' isn't a lower_case_with_underscores identifier • lib/Constants/StyleConstants.dart:1:1 • file_names
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/Constants/StyleConstants.dart:104:20 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/Constants/StyleConstants.dart:109:59 • deprecated_member_use
+   info • Don't invoke 'print' in production code • lib/Constants/constant.dart:31:5 • avoid_print
+   info • Don't invoke 'print' in production code • lib/Constants/constant.dart:43:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/Constants/constant.dart:45:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/Constants/constant.dart:49:5 • avoid_print
+   info • Don't invoke 'print' in production code • lib/Constants/constant.dart:69:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/Constants/constant.dart:71:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/Constants/constant.dart:74:5 • avoid_print
+   info • The file name 'DashboardScreen.dart' isn't a lower_case_with_underscores identifier • lib/DashboardScreen.dart:1:1 • file_names
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/DashboardScreen.dart:228:34 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/DashboardScreen.dart:235:32 • deprecated_member_use
+   info • Don't invoke 'print' in production code • lib/DashboardScreen.dart:338:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/DashboardScreen.dart:373:7 • avoid_print
+   info • The file name 'BuildLoadingTile.dart' isn't a lower_case_with_underscores identifier • lib/Helper/BuildLoadingTile.dart:1:1 • file_names
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/Helper/BuildLoadingTile.dart:10:27 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/Helper/BuildLoadingTile.dart:81:48 • deprecated_member_use
+   info • The file name 'BuildProgessOverlay.dart' isn't a lower_case_with_underscores identifier • lib/Helper/BuildProgessOverlay.dart:1:1 • file_names
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/Helper/BuildProgessOverlay.dart:38:52 • deprecated_member_use
+   info • The file name 'BuildQrView.dart' isn't a lower_case_with_underscores identifier • lib/Helper/BuildQrView.dart:1:1 • file_names
+   info • The file name 'BuildRecentCollectedPanel.dart' isn't a lower_case_with_underscores identifier • lib/Helper/BuildRecentCollectedPanel.dart:1:1 • file_names
+   info • The file name 'BuildRedemptionHistory.dart' isn't a lower_case_with_underscores identifier • lib/Helper/BuildRedemptionHistory.dart:1:1 • file_names
+   info • Statements in an if should be enclosed in a block • lib/Helper/BuildRedemptionHistory.dart:41:11 • curly_braces_in_flow_control_structures
+   info • Statements in an if should be enclosed in a block • lib/Helper/BuildRedemptionHistory.dart:48:11 • curly_braces_in_flow_control_structures
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/Helper/BuildRedemptionHistory.dart:117:33 • deprecated_member_use
+   info • The file name 'BuildRewardGridViewer.dart' isn't a lower_case_with_underscores identifier • lib/Helper/BuildRewardGridViewer.dart:1:1 • file_names
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/Helper/BuildRewardGridViewer.dart:76:31 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/Helper/BuildRewardGridViewer.dart:82:55 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/Helper/BuildRewardGridViewer.dart:165:41 • deprecated_member_use
+   info • The file name 'BuildSummaryGrid.dart' isn't a lower_case_with_underscores identifier • lib/Helper/BuildSummaryGrid.dart:1:1 • file_names
+   info • Don't invoke 'print' in production code • lib/Helper/BuildSummaryGrid.dart:292:5 • avoid_print
+warning • The declaration '_getSaleTypeData' isn't referenced • lib/Helper/BuildSummaryGrid.dart:298:35 • unused_element
+   info • Don't invoke 'print' in production code • lib/Helper/BuildSummaryGrid.dart:331:5 • avoid_print
+warning • The declaration '_getFuelSaleData' isn't referenced • lib/Helper/BuildSummaryGrid.dart:337:35 • unused_element
+   info • Don't invoke 'print' in production code • lib/Helper/BuildSummaryGrid.dart:370:5 • avoid_print
+   info • The file name 'CameraScannerDialog.dart' isn't a lower_case_with_underscores identifier • lib/Helper/CameraScannerDialog.dart:1:1 • file_names
+   info • The prefix 'Config' isn't a lower_case_with_underscores identifier • lib/Helper/CameraScannerDialog.dart:13:51 • library_prefixes
+   info • Don't invoke 'print' in production code • lib/Helper/CameraScannerDialog.dart:212:5 • avoid_print
+   info • Don't use 'BuildContext's across async gaps • lib/Helper/CameraScannerDialog.dart:307:22 • use_build_context_synchronously
+   info • Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check • lib/Helper/CameraScannerDialog.dart:338:25 • use_build_context_synchronously
+   info • Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check • lib/Helper/CameraScannerDialog.dart:353:66 • use_build_context_synchronously
+   info • Don't use 'BuildContext's across async gaps • lib/Helper/CameraScannerDialog.dart:402:23 • use_build_context_synchronously
+   info • Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check • lib/Helper/CameraScannerDialog.dart:426:23 • use_build_context_synchronously
+   info • Don't use 'BuildContext's across async gaps • lib/Helper/CameraScannerDialog.dart:619:32 • use_build_context_synchronously
+   info • Don't use 'BuildContext's across async gaps • lib/Helper/CameraScannerDialog.dart:620:27 • use_build_context_synchronously
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/Helper/CameraScannerDialog.dart:633:39 • deprecated_member_use
+   info • The file name 'CustomerAppBar.dart' isn't a lower_case_with_underscores identifier • lib/Helper/CustomerAppBar.dart:1:1 • file_names
+   info • The variable name 'CustomizeAppBar' isn't a lowerCamelCase identifier • lib/Helper/CustomerAppBar.dart:9:8 • non_constant_identifier_names
+   info • The file name 'DataCell.dart' isn't a lower_case_with_underscores identifier • lib/Helper/DataCell.dart:1:1 • file_names
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/Helper/DataCell.dart:7:20 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/Helper/DataCell.dart:9:39 • deprecated_member_use
+   info • The file name 'FetchWithProgress.dart' isn't a lower_case_with_underscores identifier • lib/Helper/FetchWithProgress.dart:1:1 • file_names
+   info • The file name 'InDevelopmentOverlay.dart' isn't a lower_case_with_underscores identifier • lib/Helper/InDevelopmentOverlay.dart:1:1 • file_names
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/Helper/InDevelopmentOverlay.dart:13:50 • deprecated_member_use
+   info • The file name 'MsAppBar.dart' isn't a lower_case_with_underscores identifier • lib/Helper/MsAppBar.dart:1:1 • file_names
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/Helper/MsAppBar.dart:122:20 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/Helper/MsAppBar.dart:125:61 • deprecated_member_use
+   info • The file name 'PumpBySaleReport.dart' isn't a lower_case_with_underscores identifier • lib/Helper/PumpBySaleReport.dart:1:1 • file_names
+   info • Don't invoke 'print' in production code • lib/Helper/PumpBySaleReport.dart:287:3 • avoid_print
+   info • The file name 'RewardDetailContent.dart' isn't a lower_case_with_underscores identifier • lib/Helper/RewardDetailContent.dart:1:1 • file_names
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/Helper/RewardDetailContent.dart:161:43 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/Helper/RewardDetailContent.dart:167:45 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/Helper/RewardDetailContent.dart:180:73 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/Helper/RewardDetailContent.dart:254:28 • deprecated_member_use
+   info • The file name 'RewardDetailDialog.dart' isn't a lower_case_with_underscores identifier • lib/Helper/RewardDetailDialog.dart:1:1 • file_names
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/Helper/RewardDetailDialog.dart:29:35 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/Helper/RewardDetailDialog.dart:35:59 • deprecated_member_use
+   info • The file name 'RewardQrScannerDialog.dart' isn't a lower_case_with_underscores identifier • lib/Helper/RewardQrScannerDialog.dart:1:1 • file_names
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/Helper/RewardQrScannerDialog.dart:197:45 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/Helper/RewardQrScannerDialog.dart:230:52 • deprecated_member_use
+   info • The file name 'SaleDetailReport.dart' isn't a lower_case_with_underscores identifier • lib/Helper/SaleDetailReport.dart:1:1 • file_names
+   info • The file name 'StockLedgerReport.dart' isn't a lower_case_with_underscores identifier • lib/Helper/StockLedgerReport.dart:1:1 • file_names
+   info • The file name 'TextFieldDialog.dart' isn't a lower_case_with_underscores identifier • lib/Helper/TextFieldDialog.dart:1:1 • file_names
+   info • The prefix 'Config' isn't a lower_case_with_underscores identifier • lib/Helper/TextFieldDialog.dart:6:51 • library_prefixes
+   info • The variable name 'voc_no' isn't a lowerCamelCase identifier • lib/Helper/TextFieldDialog.dart:11:16 • non_constant_identifier_names
+   info • The variable name 'vehical_no' isn't a lowerCamelCase identifier • lib/Helper/TextFieldDialog.dart:12:16 • non_constant_identifier_names
+   info • The variable name 'fuel_type' isn't a lowerCamelCase identifier • lib/Helper/TextFieldDialog.dart:13:16 • non_constant_identifier_names
+   info • The variable name 'sale_type' isn't a lowerCamelCase identifier • lib/Helper/TextFieldDialog.dart:15:16 • non_constant_identifier_names
+   info • The variable name 'unit_price' isn't a lowerCamelCase identifier • lib/Helper/TextFieldDialog.dart:16:17 • non_constant_identifier_names
+   info • The variable name 'sale_liter' isn't a lowerCamelCase identifier • lib/Helper/TextFieldDialog.dart:17:17 • non_constant_identifier_names
+   info • The variable name 'voc_no' isn't a lowerCamelCase identifier • lib/Helper/TextFieldDialog.dart:22:19 • non_constant_identifier_names
+   info • The variable name 'vehical_no' isn't a lowerCamelCase identifier • lib/Helper/TextFieldDialog.dart:23:19 • non_constant_identifier_names
+   info • The variable name 'fuel_type' isn't a lowerCamelCase identifier • lib/Helper/TextFieldDialog.dart:24:19 • non_constant_identifier_names
+   info • The variable name 'sale_type' isn't a lowerCamelCase identifier • lib/Helper/TextFieldDialog.dart:26:19 • non_constant_identifier_names
+   info • The variable name 'unit_price' isn't a lowerCamelCase identifier • lib/Helper/TextFieldDialog.dart:27:10 • non_constant_identifier_names
+   info • The variable name 'sale_liter' isn't a lowerCamelCase identifier • lib/Helper/TextFieldDialog.dart:28:10 • non_constant_identifier_names
+   info • Invalid use of a private type in a public API • lib/Helper/TextFieldDialog.dart:32:3 • library_private_types_in_public_api
+   info • Don't use 'BuildContext's across async gaps • lib/Helper/TextFieldDialog.dart:209:22 • use_build_context_synchronously
+   info • Don't use 'BuildContext's across async gaps • lib/Helper/TextFieldDialog.dart:659:32 • use_build_context_synchronously
+   info • Don't use 'BuildContext's across async gaps • lib/Helper/TextFieldDialog.dart:660:27 • use_build_context_synchronously
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/Helper/TextFieldDialog.dart:673:39 • deprecated_member_use
+   info • The file name 'LoyaltyReportScreen.dart' isn't a lower_case_with_underscores identifier • lib/LoyaltyReportScreen.dart:1:1 • file_names
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/LoyaltyReportScreen.dart:280:57 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/LoyaltyReportScreen.dart:282:76 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/LoyaltyReportScreen.dart:406:45 • deprecated_member_use
+warning • The value of the local variable 'isDark' isn't used • lib/LoyaltyReportScreen.dart:454:11 • unused_local_variable
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/LoyaltyReportScreen.dart:484:22 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/LoyaltyReportScreen.dart:486:41 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/LoyaltyReportScreen.dart:593:49 • deprecated_member_use
+   info • Don't use 'BuildContext's across async gaps • lib/LoyaltyReportScreen.dart:619:30 • use_build_context_synchronously
+   info • Don't use 'BuildContext's across async gaps • lib/LoyaltyReportScreen.dart:647:28 • use_build_context_synchronously
+   info • Don't use 'BuildContext's across async gaps • lib/LoyaltyReportScreen.dart:651:28 • use_build_context_synchronously
+   info • The file name 'AppSettings.dart' isn't a lower_case_with_underscores identifier • lib/Model/AppSettings.dart:1:1 • file_names
+   info • The file name 'AppSettings.dart' isn't a lower_case_with_underscores identifier • lib/Model/AppSettings.g.dart:1:1 • file_names
+   info • The file name 'BuildFuelTypeChip.dart' isn't a lower_case_with_underscores identifier • lib/Model/BuildFuelTypeChip.dart:1:1 • file_names
+   info • The file name 'FuelTypeMode.dart' isn't a lower_case_with_underscores identifier • lib/Model/FuelTypeMode.dart:1:1 • file_names
+   info • The file name 'GiftCardModel.dart' isn't a lower_case_with_underscores identifier • lib/Model/GiftCardModel.dart:1:1 • file_names
+   info • The file name 'OfflineTransaction.dart' isn't a lower_case_with_underscores identifier • lib/Model/OfflineTransaction.dart:1:1 • file_names
+   info • The file name 'OfflineTransaction.dart' isn't a lower_case_with_underscores identifier • lib/Model/OfflineTransaction.g.dart:1:1 • file_names
+   info • The file name 'SaleDataModel.dart' isn't a lower_case_with_underscores identifier • lib/Model/SaleDataModel.dart:1:1 • file_names
+   info • The file name 'SaleLoadStatus.dart' isn't a lower_case_with_underscores identifier • lib/Model/SaleLoadStatus.dart:1:1 • file_names
+   info • The file name 'SaleTypeModel.dart' isn't a lower_case_with_underscores identifier • lib/Model/SaleTypeModel.dart:1:1 • file_names
+   info • The file name 'ReportScreen.dart' isn't a lower_case_with_underscores identifier • lib/ReportScreen.dart:1:1 • file_names
+   info • The private field _sortAscending could be 'final' • lib/ReportScreen.dart:69:8 • prefer_final_fields
+warning • The declaration '_calculateSalesByType' isn't referenced • lib/ReportScreen.dart:518:23 • unused_element
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/ReportScreen.dart:704:14 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/ReportScreen.dart:707:59 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/ReportScreen.dart:791:33 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/ReportScreen.dart:895:35 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/ReportScreen.dart:980:34 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/ReportScreen.dart:1055:34 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/ReportScreen.dart:1141:41 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/ReportScreen.dart:1156:53 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/ReportScreen.dart:1234:46 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/ReportScreen.dart:1239:63 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/ReportScreen.dart:1314:50 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/ReportScreen.dart:1363:56 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/ReportScreen.dart:1481:59 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/ReportScreen.dart:1527:40 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/ReportScreen.dart:1777:38 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/ReportScreen.dart:1835:47 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/ReportScreen.dart:1921:34 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/ReportScreen.dart:2007:28 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/ReportScreen.dart:2008:28 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/ReportScreen.dart:2010:41 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/ReportScreen.dart:2017:28 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/ReportScreen.dart:2074:69 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/ReportScreen.dart:2223:38 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/ReportScreen.dart:2223:71 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/ReportScreen.dart:2225:74 • deprecated_member_use
+   info • The file name 'RewardPointScreen.dart' isn't a lower_case_with_underscores identifier • lib/RewardPointScreen.dart:1:1 • file_names
+warning • Unused import: 'package:isar/isar.dart' • lib/RewardPointScreen.dart:13:8 • unused_import
+   info • Invalid use of a private type in a public API • lib/RewardPointScreen.dart:19:3 • library_private_types_in_public_api
+warning • The '!' will have no effect because the receiver can't be null • lib/RewardPointScreen.dart:420:37 • unnecessary_non_null_assertion
+   info • The file name 'SaleEntryScreen.dart' isn't a lower_case_with_underscores identifier • lib/SaleEntryScreen.dart:1:1 • file_names
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/SaleEntryScreen.dart:84:34 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/SaleEntryScreen.dart:101:36 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/SaleEntryScreen.dart:134:36 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/SaleEntryScreen.dart:159:36 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/SaleEntryScreen.dart:249:62 • deprecated_member_use
+   info • The file name 'CheckAlreadyCollectedReport.dart' isn't a lower_case_with_underscores identifier • lib/Screens/CheckAlreadyCollectedReport.dart:1:1 • file_names
+   info • The file name 'ReportDetailListScreen.dart' isn't a lower_case_with_underscores identifier • lib/Screens/ReportDetailListScreen.dart:1:1 • file_names
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/Screens/ReportDetailListScreen.dart:163:40 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/Screens/ReportDetailListScreen.dart:195:61 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/Screens/ReportDetailListScreen.dart:247:54 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/Screens/ReportDetailListScreen.dart:262:77 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/Screens/ReportDetailListScreen.dart:344:66 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/Screens/ReportDetailListScreen.dart:380:30 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/Screens/ReportDetailListScreen.dart:576:40 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/Screens/ReportDetailListScreen.dart:677:44 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/Screens/ReportDetailListScreen.dart:703:22 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/Screens/ReportDetailListScreen.dart:705:41 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/Screens/ReportDetailListScreen.dart:754:32 • deprecated_member_use
+   info • The file name 'RewardDetailScreen.dart' isn't a lower_case_with_underscores identifier • lib/Screens/RewardDetailScreen.dart:1:1 • file_names
+   info • The file name 'StockReportScreen.dart' isn't a lower_case_with_underscores identifier • lib/Screens/StockReportScreen.dart:1:1 • file_names
+   info • Don't use 'BuildContext's across async gaps • lib/Screens/StockReportScreen.dart:117:28 • use_build_context_synchronously
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/Screens/StockReportScreen.dart:233:44 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/Screens/StockReportScreen.dart:235:53 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/Screens/StockReportScreen.dart:237:61 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/Screens/StockReportScreen.dart:290:41 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/Screens/StockReportScreen.dart:292:47 • deprecated_member_use
+   info • 'value' is deprecated and shouldn't be used. Use initialValue instead. This will set the initial value for the form field. This feature was deprecated after v3.33.0-1.0.pre • lib/Screens/StockReportScreen.dart:338:17 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/Screens/StockReportScreen.dart:430:68 • deprecated_member_use
+   info • The file name 'ActivityService.dart' isn't a lower_case_with_underscores identifier • lib/Services/ActivityService.dart:1:1 • file_names
+   info • Don't invoke 'print' in production code • lib/Services/ActivityService.dart:22:7 • avoid_print
+   info • The file name 'AuthService.dart' isn't a lower_case_with_underscores identifier • lib/Services/AuthService.dart:1:1 • file_names
+warning • Dead code • lib/Services/AuthService.dart:32:7 • dead_code
+   info • The file name 'CheckVocNoExists.dart' isn't a lower_case_with_underscores identifier • lib/Services/CheckVocNoExists.dart:1:1 • file_names
+   info • The file name 'ConnectionStatus.dart' isn't a lower_case_with_underscores identifier • lib/Services/ConnectionStatus.dart:1:1 • file_names
+   info • The file name 'FetchUserNameCache.dart' isn't a lower_case_with_underscores identifier • lib/Services/FetchUserNameCache.dart:1:1 • file_names
+   info • The file name 'FuelPriceService.dart' isn't a lower_case_with_underscores identifier • lib/Services/FuelPriceService.dart:1:1 • file_names
+   info • Don't invoke 'print' in production code • lib/Services/FuelPriceService.dart:54:7 • avoid_print
+   info • The file name 'FuelTypeStorage.dart' isn't a lower_case_with_underscores identifier • lib/Services/FuelTypeStorage.dart:1:1 • file_names
+   info • The file name 'GetSaleType.dart' isn't a lower_case_with_underscores identifier • lib/Services/GetSaleType.dart:1:1 • file_names
+   info • The file name 'UpdateService.dart' isn't a lower_case_with_underscores identifier • lib/Services/UpdateService.dart:1:1 • file_names
+   info • 'WillPopScope' is deprecated and shouldn't be used. Use PopScope instead. The Android predictive back feature will not work with WillPopScope. This feature was deprecated after v3.12.0-1.0.pre • lib/Services/UpdateService.dart:50:29 • deprecated_member_use
+   info • The file name 'SettingScreen.dart' isn't a lower_case_with_underscores identifier • lib/SettingScreen.dart:1:1 • file_names
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/SettingScreen.dart:465:42 • deprecated_member_use
+   info • The file name 'SetupScreen.dart' isn't a lower_case_with_underscores identifier • lib/SetupScreen.dart:1:1 • file_names
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/SetupScreen.dart:240:24 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/SetupScreen.dart:242:43 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/SetupScreen.dart:248:54 • deprecated_member_use
+   info • 'value' is deprecated and shouldn't be used. Use initialValue instead. This will set the initial value for the form field. This feature was deprecated after v3.33.0-1.0.pre • lib/SetupScreen.dart:304:13 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/SetupScreen.dart:369:46 • deprecated_member_use
+   info • The file name 'SplashScreen.dart' isn't a lower_case_with_underscores identifier • lib/SplashScreen.dart:1:1 • file_names
+   info • Invalid use of a private type in a public API • lib/SplashScreen.dart:15:3 • library_private_types_in_public_api
+warning • The value of the field '_isApiOnline' isn't used • lib/SplashScreen.dart:20:8 • unused_field
+   info • Empty catch block • lib/SplashScreen.dart:119:19 • empty_catches
+   info • Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check • lib/SplashScreen.dart:122:45 • use_build_context_synchronously
+   info • Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check • lib/SplashScreen.dart:129:9 • use_build_context_synchronously
+   info • Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check • lib/SplashScreen.dart:134:24 • use_build_context_synchronously
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/SplashScreen.dart:189:49 • deprecated_member_use
+   info • The file name 'ThemeProvider.dart' isn't a lower_case_with_underscores identifier • lib/ThemeProvider.dart:1:1 • file_names
+   info • Don't use 'BuildContext's across async gaps • lib/app_launcher_screen.dart:42:28 • use_build_context_synchronously
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/app_launcher_screen.dart:201:28 • deprecated_member_use
+   info • Invalid use of a private type in a public API • lib/login_page.dart:14:3 • library_private_types_in_public_api
+   info • Don't use 'BuildContext's across async gaps • lib/login_page.dart:68:22 • use_build_context_synchronously
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/login_page.dart:283:59 • deprecated_member_use
+   info • The prefix 'Config' isn't a lower_case_with_underscores identifier • lib/main.dart:9:51 • library_prefixes
+   info • Don't invoke 'print' in production code • lib/main.dart:20:3 • avoid_print
+   info • Invalid use of a private type in a public API • lib/summary_view.dart:15:3 • library_private_types_in_public_api
+warning • The value of the local variable 'isDark' isn't used • lib/summary_view.dart:25:11 • unused_local_variable
+   info • Don't invoke 'print' in production code • test_schema.dart:14:7 • avoid_print
+   info • Don't invoke 'print' in production code • test_schema.dart:16:7 • avoid_print
+   info • Don't invoke 'print' in production code • test_schema.dart:19:5 • avoid_print
+
