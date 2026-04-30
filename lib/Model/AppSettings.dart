@@ -12,6 +12,8 @@ class AppSettings {
   String? dbUser;
   String? dbPass;
   String? dbName;
+  String? dbPort;
   String? apiUrl;
+  bool isHoConfig = false;
   bool useCameraScanner = false;
 }

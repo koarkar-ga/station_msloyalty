@@ -42,12 +42,27 @@ class _StockReportScreenState extends State<StockReportScreen> {
 
       if (mounted) {
         setState(() {
-          _stations = List<Map<String, dynamic>>.from(response);
-          if (AppConfig.currentUserLevel <= 2) {
-            _stations.insert(0, {'station_id': 'ALL', 'name': 'ALL STATIONS'});
-            _selectedStationId = 'ALL';
+          final allStations = List<Map<String, dynamic>>.from(response);
+          if (AppConfig.isHoConfig) {
+            _stations = allStations;
+            if (AppConfig.currentUserLevel <= 2) {
+              _stations.insert(0, {'station_id': 'ALL', 'name': 'ALL STATIONS'});
+              _selectedStationId = 'ALL';
+            } else {
+              _selectedStationId = AppConfig.stationId;
+            }
           } else {
+            _stations = allStations
+                .where((s) => s['station_id'] == AppConfig.stationId)
+                .toList();
+            if (_stations.isEmpty) {
+              _stations = [
+                {'station_id': AppConfig.stationId, 'name': AppConfig.stationName}
+              ];
+            }
             _selectedStationId = AppConfig.stationId;
+            // Fetch data automatically
+            _fetchStockData();
           }
         });
       }
@@ -128,20 +143,26 @@ class _StockReportScreenState extends State<StockReportScreen> {
     super.dispose();
   }
 
-  Map<String, Map<String, double>> _calculateFuelSummary() {
-    Map<String, Map<String, double>> summary = {};
+  Map<String, Map<String, dynamic>> _calculateFuelSummary() {
+    Map<String, Map<String, dynamic>> summary = {};
     for (var row in _stockData) {
       String fuel = row['FuelTypeName'] ?? 'Other';
+      String code = row['FuelTypeCode'] ?? row['Code'] ?? '-';
       double opening = _getNum(row, 'opening');
       double received = _getNum(row, 'received');
       double sale = _getNum(row, 'sale');
       double closing = _getNum(row, 'closing');
       double actual = _getNum(row, 'tankbalance');
 
+      double adjust = _getNum(row, 'adjust');
+      double mobile = _getNum(row, 'mobile');
+
       if (summary.containsKey(fuel)) {
         summary[fuel]!['opening'] = summary[fuel]!['opening']! + opening;
         summary[fuel]!['received'] = summary[fuel]!['received']! + received;
         summary[fuel]!['sale'] = summary[fuel]!['sale']! + sale;
+        summary[fuel]!['adjust'] = summary[fuel]!['adjust']! + adjust;
+        summary[fuel]!['mobile'] = summary[fuel]!['mobile']! + mobile;
         summary[fuel]!['closing'] = summary[fuel]!['closing']! + closing;
         summary[fuel]!['actual'] = summary[fuel]!['actual']! + actual;
       } else {
@@ -149,12 +170,98 @@ class _StockReportScreenState extends State<StockReportScreen> {
           'opening': opening,
           'received': received,
           'sale': sale,
+          'adjust': adjust,
+          'mobile': mobile,
           'closing': closing,
           'actual': actual,
+          'code': double.tryParse(code) ?? 0.0,
+          'code_raw': code,
         };
       }
     }
     return summary;
+  }
+
+  Widget _buildProductSummaryTable(Map<String, Map<String, dynamic>> summary, bool isDark) {
+    final f = NumberFormat('#,###.0');
+    final sortedEntries = summary.entries.toList()
+      ..sort((a, b) => (a.value['code'] ?? 0).compareTo(b.value['code'] ?? 0));
+
+    return Card(
+      margin: const EdgeInsets.all(16),
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Text(
+              "PRODUCT SUMMARY",
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+                color: isDark ? Colors.tealAccent : Colors.teal.shade700,
+                letterSpacing: 1.2,
+              ),
+            ),
+          ),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: DataTable(
+              headingRowHeight: 40,
+              dataRowMinHeight: 35,
+              dataRowMaxHeight: 45,
+              horizontalMargin: 12,
+              columnSpacing: 20,
+              headingRowColor: WidgetStateProperty.all(
+                isDark ? Colors.teal.withOpacity(0.2) : Colors.teal.withOpacity(0.05),
+              ),
+              columns: const [
+                DataColumn(label: Text("#", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold))),
+                DataColumn(label: Text("Code", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold))),
+                DataColumn(label: Text("Item Name", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold))),
+                DataColumn(label: Text("Opening", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold), textAlign: TextAlign.right)),
+                DataColumn(label: Text("Receipt", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold), textAlign: TextAlign.right)),
+                DataColumn(label: Text("Sale", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold), textAlign: TextAlign.right)),
+                DataColumn(label: Text("System Bal", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold), textAlign: TextAlign.right)),
+                DataColumn(label: Text("Tank Actual", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold), textAlign: TextAlign.right)),
+                DataColumn(label: Text("Today G/L", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold), textAlign: TextAlign.right)),
+              ],
+              rows: List.generate(sortedEntries.length, (index) {
+                final entry = sortedEntries[index];
+                final fuel = entry.key;
+                final v = entry.value;
+                final gl = v['actual']! - v['closing']!;
+                
+                return DataRow(
+                  cells: [
+                    DataCell(Text("${index + 1}", style: const TextStyle(fontSize: 11))),
+                    DataCell(Text(v['code_raw']?.toString() ?? "-", style: const TextStyle(fontSize: 11))),
+                    DataCell(Text(fuel, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500))),
+                    DataCell(Text(f.format(v['opening']), style: const TextStyle(fontSize: 11))),
+                    DataCell(Text(f.format(v['received']), style: const TextStyle(fontSize: 11))),
+                    DataCell(Text(f.format(v['sale']), style: const TextStyle(fontSize: 11))),
+                    DataCell(Text(f.format(v['closing']), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold))),
+                    DataCell(Text(f.format(v['actual']), style: const TextStyle(fontSize: 11, color: Colors.blue))),
+                    DataCell(
+                      Text(
+                        f.format(gl),
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: gl < 0 ? Colors.red : (gl > 0 ? Colors.green : null),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              }),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -181,6 +288,7 @@ class _StockReportScreenState extends State<StockReportScreen> {
               children: [
                 _buildFilterRow(isDark),
                 if (_stockData.isNotEmpty) ...[
+                  _buildProductSummaryTable(fuelSummary, isDark),
                   _buildSummaryCards(fuelSummary, isDark),
                   const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -270,7 +378,7 @@ class _StockReportScreenState extends State<StockReportScreen> {
     );
   }
 
-  Widget _buildSummaryCards(Map<String, Map<String, double>> summary, bool isDark) {
+  Widget _buildSummaryCards(Map<String, Map<String, dynamic>> summary, bool isDark) {
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Wrap(
@@ -281,7 +389,7 @@ class _StockReportScreenState extends State<StockReportScreen> {
     );
   }
 
-  Widget _buildFuelCard(String fuel, Map<String, double> values, bool isDark) {
+  Widget _buildFuelCard(String fuel, Map<String, dynamic> values, bool isDark) {
     final f = NumberFormat('#,###.0');
     return Container(
       width: 180,
@@ -300,9 +408,13 @@ class _StockReportScreenState extends State<StockReportScreen> {
           _row("Received (L)", f.format(values['received'])),
           _row("Received (G)", f.format(values['received']! / 4.546)),
           _row("Total Sale", f.format(values['sale'])),
+          if (values['adjust'] != 0) _row("Adjust", f.format(values['adjust'])),
+          if (values['mobile'] != 0) _row("Mobile", f.format(values['mobile'])),
           _row("Tank Actual", f.format(values['actual'])),
           const Divider(),
-          _row("Balance (GL)", f.format(values['opening']! + values['received']! - values['sale']!)),
+          _row("System Balance", f.format(values['closing'])),
+          _row("Today G/L", f.format(values['actual']! - values['closing']!), 
+               color: (values['actual']! - values['closing']!) < 0 ? Colors.red : Colors.green),
         ],
       ),
     );
@@ -330,8 +442,8 @@ class _StockReportScreenState extends State<StockReportScreen> {
         runSpacing: 16,
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
-          // Station Selection (only for Admin)
-          if (AppConfig.currentUserLevel <= 2)
+          // Station Selection (only for Admin and HO)
+          if (AppConfig.isHoConfig && AppConfig.currentUserLevel <= 2)
             SizedBox(
               width: 200,
               child: DropdownButtonFormField<String>(
@@ -587,9 +699,33 @@ class _StockReportScreenState extends State<StockReportScreen> {
 
   double _getNum(dynamic row, String key) {
     if (row == null) return 0.0;
-    // Check lowercase, camelCase, and Capitalized
-    final val = row[key] ?? row[key.substring(0, 1).toUpperCase() + key.substring(1)] ?? row[key.toUpperCase()];
+    
+    // 1. Try to find the value using various key formats
+    dynamic val = row[key];
+    
+    // 2. Specialized fallbacks for "opening" which is often named differently
+    if (val == null && key.toLowerCase() == 'opening') {
+      val = row['opening_balance'] ?? 
+            row['Opening_Balance'] ?? 
+            row['OpeningBalance'] ?? 
+            row['opening_stock'] ?? 
+            row['OpeningStock'] ??
+            row['stock_opening'] ??
+            row['Balance_Opening'];
+    }
+
+    // 3. General fallbacks (CamelCase, PascalCase, UPPERCASE)
+    if (val == null) {
+      val = row[key.substring(0, 1).toUpperCase() + key.substring(1)] ?? 
+            row[key.toUpperCase()];
+    }
+    
     if (val == null) return 0.0;
-    return (val is num) ? val.toDouble() : (double.tryParse(val.toString()) ?? 0.0);
+
+    if (val is num) return val.toDouble();
+    
+    // 4. Handle String numbers (remove commas)
+    final cleaned = val.toString().replaceAll(',', '');
+    return double.tryParse(cleaned) ?? 0.0;
   }
 }

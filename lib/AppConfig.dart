@@ -15,6 +15,8 @@ class AppConfig {
   static String database = "M001";
   static String exportPath = "";
   static String apiUrl = "http://localhost:3000";
+  static String port = "1433";
+  static bool isHoConfig = false;
   static String apiHealthUrl = "${AppConfig.apiUrl}/api/health";
   static int currentUserLevel = 11; // Default to basic level
   static String? currentUserId;
@@ -45,10 +47,12 @@ class AppConfig {
         password = settings.dbPass ?? "infosys2011iss@";
         database = settings.dbName ?? "M001";
         apiUrl = settings.apiUrl ?? "http://localhost:3000";
+        port = settings.dbPort ?? "1433";
+        isHoConfig = settings.isHoConfig;
         apiHealthUrl = "$apiUrl/api/health";
 
         print(
-          "Config Loaded from Isar: Name=$stationName, ID=$stationId, Host=$host, User=$username, DB=$database, API=$apiUrl",
+          "Config Loaded from Isar: Name=$stationName, ID=$stationId, Host=$host, Port=$port, User=$username, DB=$database, API=$apiUrl, HO=$isHoConfig",
         );
       } else {
         configExists = false;
@@ -70,6 +74,8 @@ class AppConfig {
     required String dbPass,
     required String dbName,
     required String api,
+    String dbPort = "1433",
+    bool hoConfig = false,
   }) async {
     try {
       final settings =
@@ -82,6 +88,8 @@ class AppConfig {
       settings.dbPass = dbPass;
       settings.dbName = dbName;
       settings.apiUrl = api;
+      settings.dbPort = dbPort;
+      settings.isHoConfig = hoConfig;
 
       await isar.writeTxn(() async {
         final id = await isar.appSettings.put(settings);
@@ -96,11 +104,13 @@ class AppConfig {
       password = dbPass;
       database = dbName;
       apiUrl = api;
+      port = dbPort;
+      isHoConfig = hoConfig;
       apiHealthUrl = "$apiUrl/api/health";
       configExists = true;
 
       print(
-        "Config Saved to Isar: Name=$name, ID=$id, Host=$dbHost, User=$dbUser, DB=$dbName, API=$api",
+        "Config Saved to Isar: Name=$name, ID=$id, Host=$dbHost, Port=$dbPort, User=$dbUser, DB=$dbName, API=$api, HO=$hoConfig",
       );
     } catch (e) {
       print("Error saving config: $e");

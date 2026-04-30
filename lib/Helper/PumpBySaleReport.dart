@@ -88,7 +88,9 @@ Future<void> exportSaleDataReport(
     String sId = row['station_id'] ?? '-';
     String sName = row['station_name'] ?? '-';
     String sKey = "${sId}_$sName";
-    String grade = row['FuelTypeName'] ?? 'Unknown';
+    String grade = (row['FuelTypeName'] == null || row['FuelTypeName'].toString().trim().isEmpty) 
+        ? (row['Sale_Type_name'] ?? 'Unknown') 
+        : row['FuelTypeName'];
     String saleType = row['Sale_Type_name'] ?? 'Cash Sale';
     double liter = double.tryParse(row['SALELITER']?.toStringAsFixed(4) ?? '0') ?? 0;
     double amount = double.tryParse(row['TotalPrice']?.toStringAsFixed(2) ?? '0') ?? 0;

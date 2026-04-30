@@ -21,6 +21,7 @@ class _SetupScreenState extends State<SetupScreen> {
   final _passController = TextEditingController(text: "infosys2011iss@");
   final _dbController = TextEditingController(text: "M001");
     final _apiController = TextEditingController(text: "http://localhost:3000");
+  final _portController = TextEditingController(text: "1433");
   final _hoPasswordController = TextEditingController();
 
   bool _isSaving = false;
@@ -42,6 +43,8 @@ class _SetupScreenState extends State<SetupScreen> {
         dbPass: _passController.text,
         dbName: _dbController.text,
         api: _apiController.text,
+        dbPort: _portController.text,
+        hoConfig: false,
       );
       
       // Validation step
@@ -64,6 +67,7 @@ class _SetupScreenState extends State<SetupScreen> {
     _passController.dispose();
     _dbController.dispose();
     _apiController.dispose();
+    _portController.dispose();
     _hoPasswordController.dispose();
     super.dispose();
   }
@@ -127,6 +131,8 @@ class _SetupScreenState extends State<SetupScreen> {
         dbPass: config['db_pass'] ?? '',
         dbName: config['db_name'] ?? 'HO',
         api: config['api_url'] ?? 'http://localhost:3000',
+        dbPort: config['db_port']?.toString() ?? '1433',
+        hoConfig: true,
       );
 
       _finalizeSetup();
@@ -329,6 +335,7 @@ class _SetupScreenState extends State<SetupScreen> {
           _buildTextField(_hostController, "Database Hostname", Icons.cloud_queue),
           _buildTextField(_dbController, "Database Name", Icons.storage),
           _buildTextField(_userController, "DB Username", Icons.person),
+          _buildTextField(_portController, "DB Port", Icons.settings_input_component),
           _buildTextField(_passController, "DB Password", Icons.lock, isPassword: true),
           _buildTextField(_apiController, "Local API URL", Icons.link),
           const SizedBox(height: 40),

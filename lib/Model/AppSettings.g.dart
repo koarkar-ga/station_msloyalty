@@ -37,23 +37,33 @@ const AppSettingsSchema = CollectionSchema(
       name: r'dbPass',
       type: IsarType.string,
     ),
-    r'dbUser': PropertySchema(
+    r'dbPort': PropertySchema(
       id: 4,
+      name: r'dbPort',
+      type: IsarType.string,
+    ),
+    r'dbUser': PropertySchema(
+      id: 5,
       name: r'dbUser',
       type: IsarType.string,
     ),
+    r'isHoConfig': PropertySchema(
+      id: 6,
+      name: r'isHoConfig',
+      type: IsarType.bool,
+    ),
     r'stationId': PropertySchema(
-      id: 5,
+      id: 7,
       name: r'stationId',
       type: IsarType.string,
     ),
     r'stationName': PropertySchema(
-      id: 6,
+      id: 8,
       name: r'stationName',
       type: IsarType.string,
     ),
     r'useCameraScanner': PropertySchema(
-      id: 7,
+      id: 9,
       name: r'useCameraScanner',
       type: IsarType.bool,
     )
@@ -103,6 +113,12 @@ int _appSettingsEstimateSize(
     }
   }
   {
+    final value = object.dbPort;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
+  {
     final value = object.dbUser;
     if (value != null) {
       bytesCount += 3 + value.length * 3;
@@ -133,10 +149,12 @@ void _appSettingsSerialize(
   writer.writeString(offsets[1], object.dbHost);
   writer.writeString(offsets[2], object.dbName);
   writer.writeString(offsets[3], object.dbPass);
-  writer.writeString(offsets[4], object.dbUser);
-  writer.writeString(offsets[5], object.stationId);
-  writer.writeString(offsets[6], object.stationName);
-  writer.writeBool(offsets[7], object.useCameraScanner);
+  writer.writeString(offsets[4], object.dbPort);
+  writer.writeString(offsets[5], object.dbUser);
+  writer.writeBool(offsets[6], object.isHoConfig);
+  writer.writeString(offsets[7], object.stationId);
+  writer.writeString(offsets[8], object.stationName);
+  writer.writeBool(offsets[9], object.useCameraScanner);
 }
 
 AppSettings _appSettingsDeserialize(
@@ -150,11 +168,13 @@ AppSettings _appSettingsDeserialize(
   object.dbHost = reader.readStringOrNull(offsets[1]);
   object.dbName = reader.readStringOrNull(offsets[2]);
   object.dbPass = reader.readStringOrNull(offsets[3]);
-  object.dbUser = reader.readStringOrNull(offsets[4]);
+  object.dbPort = reader.readStringOrNull(offsets[4]);
+  object.dbUser = reader.readStringOrNull(offsets[5]);
   object.id = id;
-  object.stationId = reader.readStringOrNull(offsets[5]);
-  object.stationName = reader.readStringOrNull(offsets[6]);
-  object.useCameraScanner = reader.readBool(offsets[7]);
+  object.isHoConfig = reader.readBool(offsets[6]);
+  object.stationId = reader.readStringOrNull(offsets[7]);
+  object.stationName = reader.readStringOrNull(offsets[8]);
+  object.useCameraScanner = reader.readBool(offsets[9]);
   return object;
 }
 
@@ -178,8 +198,12 @@ P _appSettingsDeserializeProp<P>(
     case 5:
       return (reader.readStringOrNull(offset)) as P;
     case 6:
-      return (reader.readStringOrNull(offset)) as P;
+      return (reader.readBool(offset)) as P;
     case 7:
+      return (reader.readStringOrNull(offset)) as P;
+    case 8:
+      return (reader.readStringOrNull(offset)) as P;
+    case 9:
       return (reader.readBool(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -883,6 +907,157 @@ extension AppSettingsQueryFilter
     });
   }
 
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition> dbPortIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'dbPort',
+      ));
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+      dbPortIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'dbPort',
+      ));
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition> dbPortEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'dbPort',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+      dbPortGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'dbPort',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition> dbPortLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'dbPort',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition> dbPortBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'dbPort',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+      dbPortStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'dbPort',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition> dbPortEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'dbPort',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition> dbPortContains(
+      String value,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'dbPort',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition> dbPortMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'dbPort',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+      dbPortIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'dbPort',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+      dbPortIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'dbPort',
+        value: '',
+      ));
+    });
+  }
+
   QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition> dbUserIsNull() {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(const FilterCondition.isNull(
@@ -1083,6 +1258,16 @@ extension AppSettingsQueryFilter
         includeLower: includeLower,
         upper: upper,
         includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+      isHoConfigEqualTo(bool value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'isHoConfig',
+        value: value,
       ));
     });
   }
@@ -1462,6 +1647,18 @@ extension AppSettingsQuerySortBy
     });
   }
 
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy> sortByDbPort() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'dbPort', Sort.asc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy> sortByDbPortDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'dbPort', Sort.desc);
+    });
+  }
+
   QueryBuilder<AppSettings, AppSettings, QAfterSortBy> sortByDbUser() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'dbUser', Sort.asc);
@@ -1471,6 +1668,18 @@ extension AppSettingsQuerySortBy
   QueryBuilder<AppSettings, AppSettings, QAfterSortBy> sortByDbUserDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'dbUser', Sort.desc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy> sortByIsHoConfig() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isHoConfig', Sort.asc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy> sortByIsHoConfigDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isHoConfig', Sort.desc);
     });
   }
 
@@ -1563,6 +1772,18 @@ extension AppSettingsQuerySortThenBy
     });
   }
 
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy> thenByDbPort() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'dbPort', Sort.asc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy> thenByDbPortDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'dbPort', Sort.desc);
+    });
+  }
+
   QueryBuilder<AppSettings, AppSettings, QAfterSortBy> thenByDbUser() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'dbUser', Sort.asc);
@@ -1584,6 +1805,18 @@ extension AppSettingsQuerySortThenBy
   QueryBuilder<AppSettings, AppSettings, QAfterSortBy> thenByIdDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'id', Sort.desc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy> thenByIsHoConfig() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isHoConfig', Sort.asc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy> thenByIsHoConfigDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isHoConfig', Sort.desc);
     });
   }
 
@@ -1656,10 +1889,23 @@ extension AppSettingsQueryWhereDistinct
     });
   }
 
+  QueryBuilder<AppSettings, AppSettings, QDistinct> distinctByDbPort(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'dbPort', caseSensitive: caseSensitive);
+    });
+  }
+
   QueryBuilder<AppSettings, AppSettings, QDistinct> distinctByDbUser(
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'dbUser', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QDistinct> distinctByIsHoConfig() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'isHoConfig');
     });
   }
 
@@ -1717,9 +1963,21 @@ extension AppSettingsQueryProperty
     });
   }
 
+  QueryBuilder<AppSettings, String?, QQueryOperations> dbPortProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'dbPort');
+    });
+  }
+
   QueryBuilder<AppSettings, String?, QQueryOperations> dbUserProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'dbUser');
+    });
+  }
+
+  QueryBuilder<AppSettings, bool, QQueryOperations> isHoConfigProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'isHoConfig');
     });
   }
 

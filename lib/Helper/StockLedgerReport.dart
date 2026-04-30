@@ -21,48 +21,52 @@ Future<void> exportStockLedgerReport(List<dynamic> queryData) async {
   cellStyle.vAlign = xlsio.VAlignType.center;
   cellStyle.numberFormat = '#,##0.0';
 
-  List<String> headers = [
-    "Sr",
-    "Tank No",
-    "Tank Name",
-    "Fuel Type",
-    "Capacity",
-    "Opening",
-    "Received (L)",
-    "Received (G)",
-    "Sale",
-    "Closing",
-    "Tank Balance",
-    "Gain/Loss",
-  ];
-
-  for (int i = 0; i < headers.length; i++) {
-    var cell = sheet.getRangeByIndex(1, i + 1);
-    cell.setText(headers[i]);
-    cell.cellStyle = headerStyle;
-  }
-
-  for (int i = 0; i < queryData.length; i++) {
-    var row = queryData[i];
-    int rowIndex = i + 2;
-
-    double receivedL = (row['received'] ?? 0.0).toDouble();
-    double receivedG = receivedL / 4.546;
-
-    final values = [
-      "${i + 1}",
-      row['Tank_No'] ?? '-',
-      row['Tank_Name'] ?? '-',
-      row['FuelTypeName'] ?? '-',
-      row['Capacity'] ?? 0.0,
-      row['opening'] ?? 0.0,
-      receivedL,
-      receivedG,
-      row['sale'] ?? 0.0,
-      row['closing'] ?? 0.0,
-      row['tankbalance'] ?? 0.0,
-      row['Gain_Mine'] ?? 0.0,
+    List<String> headers = [
+      "Sr",
+      "Tank No",
+      "Tank Name",
+      "Fuel Type",
+      "Capacity",
+      "Opening",
+      "Received (L)",
+      "Received (G)",
+      "Sale",
+      "Adjust",
+      "Mobile",
+      "Closing",
+      "Tank Balance",
+      "Gain/Loss",
     ];
+
+    for (int i = 0; i < headers.length; i++) {
+      var cell = sheet.getRangeByIndex(1, i + 1);
+      cell.setText(headers[i]);
+      cell.cellStyle = headerStyle;
+    }
+
+    for (int i = 0; i < queryData.length; i++) {
+      var row = queryData[i];
+      int rowIndex = i + 2;
+
+      double receivedL = (row['received'] ?? 0.0).toDouble();
+      double receivedG = receivedL / 4.546;
+
+      final values = [
+        "${i + 1}",
+        row['Tank_No'] ?? '-',
+        row['Tank_Name'] ?? '-',
+        row['FuelTypeName'] ?? '-',
+        row['Capacity'] ?? 0.0,
+        row['opening'] ?? 0.0,
+        receivedL,
+        receivedG,
+        row['sale'] ?? 0.0,
+        row['adjust'] ?? 0.0,
+        row['mobile'] ?? 0.0,
+        row['closing'] ?? 0.0,
+        row['tankbalance'] ?? 0.0,
+        row['Gain_Mine'] ?? 0.0,
+      ];
 
     for (int col = 0; col < values.length; col++) {
       var cell = sheet.getRangeByIndex(rowIndex, col + 1);

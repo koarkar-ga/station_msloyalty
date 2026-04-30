@@ -62,8 +62,10 @@ class _ReportsScreen extends State<ReportsScreen> {
   // Table Filter & Sort State
   String _searchVoucher = "";
   String _searchVehicle = "";
-  final TextEditingController _voucherSearchController = TextEditingController();
-  final TextEditingController _vehicleSearchController = TextEditingController();
+  final TextEditingController _voucherSearchController =
+      TextEditingController();
+  final TextEditingController _vehicleSearchController =
+      TextEditingController();
   String _filterFuelType = "ALL";
   String _filterSaleType = "ALL";
   bool _sortAscending = false;
@@ -125,8 +127,27 @@ class _ReportsScreen extends State<ReportsScreen> {
         return 0;
       }
     });
-
     return filtered;
+  }
+
+  List<String> get _fuelTypes {
+    final types = _salesData
+        .map((e) => (e['FuelTypeName'] ?? '').toString())
+        .where((e) => e.isNotEmpty)
+        .toSet()
+        .toList();
+    types.sort();
+    return ["ALL", ...types];
+  }
+
+  List<String> get _saleTypes {
+    final types = _salesData
+        .map((e) => (e['Sale_Type_name'] ?? '').toString())
+        .where((e) => e.isNotEmpty)
+        .toSet()
+        .toList();
+    types.sort();
+    return ["ALL", ...types];
   }
 
   final StreamController<SalesLoadStatus> salesStreamController =
@@ -186,17 +207,43 @@ class _ReportsScreen extends State<ReportsScreen> {
 
       if (mounted) {
         setState(() {
-          _stations = List<Map<String, dynamic>>.from(response.map((e) => {
-                ...e,
-                'region': e['region'] ?? 'Other',
-              }));
-          // HO User (level 1) သို့မဟုတ် Supervisor (level 2) ဖြစ်လျှင် ALL STATIONS ထည့်ပေးမယ်
-          if (AppConfig.currentUserLevel == 1 ||
-              AppConfig.currentUserLevel == 2) {
-            _stations.insert(0, {'station_id': 'ALL', 'name': 'ALL STATIONS'});
+          final allStations = List<Map<String, dynamic>>.from(
+            response.map((e) => {...e, 'region': e['region'] ?? 'Other'}),
+          );
+
+          if (AppConfig.isHoConfig) {
+            _stations = allStations;
+            // HO User (level 1) သို့မဟုတ် Supervisor (level 2) ဖြစ်လျှင် ALL STATIONS ထည့်ပေးမယ်
+            if (AppConfig.currentUserLevel == 1 ||
+                AppConfig.currentUserLevel == 2) {
+              _stations.insert(0, {
+                'station_id': 'ALL',
+                'name': 'ALL STATIONS',
+              });
+            }
+            _selectedStationIds = [];
+          } else {
+            // In Station Mode, only show the current station
+            _stations = allStations
+                .where((s) => s['station_id'] == AppConfig.stationId)
+                .toList();
+            if (_stations.isEmpty) {
+              // Fallback if current station not found in Supabase
+              _stations = [
+                {
+                  'station_id': AppConfig.stationId,
+                  'name': AppConfig.stationName,
+                  'region': 'Local',
+                },
+              ];
+            }
+            _selectedStationIds = [AppConfig.stationId];
+            // Fetch records automatically for the single station
+            final now = DateTime.now();
+            final todayStart = DateTime(now.year, now.month, now.day, 0, 0, 0);
+            final todayEnd = DateTime(now.year, now.month, now.day, 23, 59, 59);
+            _fetchInitialData(todayStart, todayEnd);
           }
-          // Default stationId ကို null ထားမယ် (User ကို ရွေးခိုင်းမယ်)
-          _selectedStationIds = [];
         });
       }
     } catch (e) {
@@ -340,8 +387,9 @@ class _ReportsScreen extends State<ReportsScreen> {
     _salesData.clear();
 
     try {
-      final List<Map<String, dynamic>> targetStations = _getEffectiveSelectedStations();
-      
+      final List<Map<String, dynamic>> targetStations =
+          _getEffectiveSelectedStations();
+
       // Initialize station progress list
       List<Map<String, dynamic>> progressList = targetStations
           .map(
@@ -474,12 +522,11 @@ class _ReportsScreen extends State<ReportsScreen> {
     }
   }
 
-
   // Sales Data ကို Sale Type အလိုက် ခွဲခြားတွက်ချက်ခြင်း
   Map<String, double> _calculateSalesByType() {
     Map<String, double> typeTotals = {};
 
-    for (var sale in _salesData) {
+    for (var sale in _filteredSalesData) {
       String typeName = sale['Sale_Type_name'] ?? 'Other';
       double amount = double.tryParse(sale['TotalPrice'].toString()) ?? 0.0;
 
@@ -496,7 +543,7 @@ class _ReportsScreen extends State<ReportsScreen> {
   Map<String, Map<String, double>> _calculateSalesSummary() {
     Map<String, Map<String, double>> summary = {};
 
-    for (var sale in _salesData) {
+    for (var sale in _filteredSalesData) {
       String typeName = sale['Sale_Type_name'] ?? 'Other';
       double amount = double.tryParse(sale['TotalPrice'].toString()) ?? 0.0;
       double liters = double.tryParse(sale['SALELITER'].toString()) ?? 0.0;
@@ -516,8 +563,8 @@ class _ReportsScreen extends State<ReportsScreen> {
 
     // အရောင်းစာရင်း list ကို loop ပတ်၍ တွက်ချက်ခြင်း
     // (မှတ်ချက် - _salesList သည် သင်၏ data list အမည်ဖြစ်ရပါမည်)
-    for (var sale in _salesData) {
-      final type = sale['FuelTypeName'] ?? 'Unknown';
+    for (var sale in _filteredSalesData) {
+      final type = sale['FuelTypeName'] ?? sale['Sale_Type_name'];
       final liter = (sale['SALELITER'] ?? 0).toDouble();
       final amount = (sale['TotalPrice'] ?? 0).toDouble();
 
@@ -552,7 +599,11 @@ class _ReportsScreen extends State<ReportsScreen> {
         AppConfig.database = sId;
 
         final List<dynamic> stationLatestSales = [];
-        await fetchWithProgress(dynamicUrl, stationLatestSales, salesStreamController);
+        await fetchWithProgress(
+          dynamicUrl,
+          stationLatestSales,
+          salesStreamController,
+        );
 
         // Normalize dates and add station info
         for (var sale in stationLatestSales) {
@@ -593,9 +644,7 @@ class _ReportsScreen extends State<ReportsScreen> {
 
           return Stack(
             children: [
-              isMobile
-                  ? _buildMobileView(status)
-                  : _buildDesktopView(status),
+              isMobile ? _buildMobileView(status) : _buildDesktopView(status),
               Visibility(
                 visible: status.isLoading,
                 child: ProgressOverlay(
@@ -624,9 +673,9 @@ class _ReportsScreen extends State<ReportsScreen> {
             fuelSummaryTable: _buildFuelSummaryTable(isMobile),
             stationSummaryTable:
                 (_selectedStationIds.contains('ALL') ||
-                        _selectedStationIds.length > 1)
-                    ? _buildStationSummaryTable(isMobile)
-                    : null,
+                    _selectedStationIds.length > 1)
+                ? _buildStationSummaryTable(isMobile)
+                : null,
           ),
           _buildHeaderInfo(isMobile),
           _salesData.isEmpty
@@ -653,9 +702,9 @@ class _ReportsScreen extends State<ReportsScreen> {
                 fuelSummaryTable: _buildFuelSummaryTable(isMobile),
                 stationSummaryTable:
                     (_selectedStationIds.contains('ALL') ||
-                            _selectedStationIds.length > 1)
-                        ? _buildStationSummaryTable(isMobile)
-                        : null,
+                        _selectedStationIds.length > 1)
+                    ? _buildStationSummaryTable(isMobile)
+                    : null,
               ),
               const SizedBox(height: 10),
               _buildHeaderInfo(isMobile),
@@ -673,7 +722,7 @@ class _ReportsScreen extends State<ReportsScreen> {
 
   // Build Header Information
   Widget _buildHeaderInfo(bool isMobile) {
-    double grandTotalLiter = _salesData.fold(
+    double grandTotalLiter = _filteredSalesData.fold(
       0,
       (prev, element) =>
           prev + (double.tryParse(element['SALELITER'].toString()) ?? 0),
@@ -688,7 +737,9 @@ class _ReportsScreen extends State<ReportsScreen> {
             .withValues(alpha: 0.5),
         border: Border(
           bottom: BorderSide(
-            color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.05),
+            color: (isDark ? Colors.white : Colors.black).withValues(
+              alpha: 0.05,
+            ),
           ),
         ),
       ),
@@ -699,7 +750,7 @@ class _ReportsScreen extends State<ReportsScreen> {
         children: [
           _buildSummaryChip(
             "စုစုပေါင်းငွေ",
-            "${NumberFormat('#,###').format(_salesData.fold<num>(0, (num sum, item) => sum + (item['TotalPrice'] ?? 0)))} Ks",
+            "${NumberFormat('#,###').format(_filteredSalesData.fold<num>(0, (num sum, item) => sum + (item['TotalPrice'] ?? 0)))} Ks",
             Colors.green,
             isDark,
           ),
@@ -743,8 +794,6 @@ class _ReportsScreen extends State<ReportsScreen> {
       ],
     );
   }
-
-
 
   // Sale Type Summary Table
   Widget _buildTypeSummaryTable(bool isMobile) {
@@ -983,7 +1032,7 @@ class _ReportsScreen extends State<ReportsScreen> {
                     context,
                     MaterialPageRoute(
                       builder: (context) => ReportDetailListScreen(
-                        salesData: data,
+                        salesData: _filteredSalesData,
                         supabase: supabase,
                       ),
                     ),
@@ -1081,10 +1130,15 @@ class _ReportsScreen extends State<ReportsScreen> {
   IconData getCategoryIcon(String category) {
     final cat = category.toLowerCase();
     if (cat.contains('cycle') || cat.contains('bike')) return Icons.motorcycle;
-    if (cat.contains('car') || cat.contains('passenger') || cat.contains('taxi')) return Icons.directions_car;
-    if (cat.contains('truck') || cat.contains('lorry')) return Icons.local_shipping;
+    if (cat.contains('car') ||
+        cat.contains('passenger') ||
+        cat.contains('taxi'))
+      return Icons.directions_car;
+    if (cat.contains('truck') || cat.contains('lorry'))
+      return Icons.local_shipping;
     if (cat.contains('bus')) return Icons.directions_bus;
-    if (cat.contains('machinery') || cat.contains('tractor')) return Icons.construction;
+    if (cat.contains('machinery') || cat.contains('tractor'))
+      return Icons.construction;
     if (cat.contains('tanker')) return Icons.oil_barrel;
     if (cat.contains('company')) return Icons.business;
     if (cat.contains('factory')) return Icons.factory;
@@ -1477,19 +1531,21 @@ class _ReportsScreen extends State<ReportsScreen> {
                   flex: 2,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        "SELECT STATION",
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.teal,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      _buildStationSelector(false),
-                    ],
+                    children: AppConfig.isHoConfig
+                        ? [
+                            const Text(
+                              "SELECT STATION",
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.teal,
+                                letterSpacing: 1.2,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            _buildStationSelector(false),
+                          ]
+                        : [],
                   ),
                 ),
                 const SizedBox(width: 24),
@@ -1550,7 +1606,25 @@ class _ReportsScreen extends State<ReportsScreen> {
                 ),
               ),
               const SizedBox(width: 16),
-              // Filter status summary or counts can go here if needed
+              Expanded(
+                child: _buildFilterDropdown(
+                  value: _filterFuelType,
+                  items: _fuelTypes,
+                  label: "Fuel Type",
+                  icon: Icons.local_gas_station_rounded,
+                  onChanged: (val) => setState(() => _filterFuelType = val!),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: _buildFilterDropdown(
+                  value: _filterSaleType,
+                  items: _saleTypes,
+                  label: "Sale Type",
+                  icon: Icons.payments_rounded,
+                  onChanged: (val) => setState(() => _filterSaleType = val!),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 10),
@@ -1669,7 +1743,7 @@ class _ReportsScreen extends State<ReportsScreen> {
       ),
       child: Column(
         children: [
-          _buildStationSelector(true),
+          if (AppConfig.isHoConfig) _buildStationSelector(true),
           GlassContainer(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -1688,6 +1762,34 @@ class _ReportsScreen extends State<ReportsScreen> {
                   icon: Icons.directions_car_rounded,
                   onChanged: (val) => setState(() => _searchVehicle = val),
                   isMobile: true,
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildFilterDropdown(
+                        value: _filterFuelType,
+                        items: _fuelTypes,
+                        label: "Fuel Type",
+                        icon: Icons.local_gas_station_rounded,
+                        onChanged: (val) =>
+                            setState(() => _filterFuelType = val!),
+                        isMobile: true,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _buildFilterDropdown(
+                        value: _filterSaleType,
+                        items: _saleTypes,
+                        label: "Sale Type",
+                        icon: Icons.payments_rounded,
+                        onChanged: (val) =>
+                            setState(() => _filterSaleType = val!),
+                        isMobile: true,
+                      ),
+                    ),
+                  ],
                 ),
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 12),
@@ -1849,24 +1951,29 @@ class _ReportsScreen extends State<ReportsScreen> {
                           ..._stations
                               .where((s) => s['station_id'] == 'ALL')
                               .map((station) {
-                            final sId = station['station_id'].toString();
-                            final sName = station['name'] ?? '';
-                            bool isAllSelected =
-                                _selectedStationIds.contains('ALL');
+                                final sId = station['station_id'].toString();
+                                final sName = station['name'] ?? '';
+                                bool isAllSelected = _selectedStationIds
+                                    .contains('ALL');
 
-                            return CheckboxListTile(
-                              title: Text(sName,
-                                  style: const TextStyle(
+                                return CheckboxListTile(
+                                  title: Text(
+                                    sName,
+                                    style: const TextStyle(
                                       fontSize: 14,
-                                      fontWeight: FontWeight.bold)),
-                              value: isAllSelected,
-                              onChanged: (val) {
-                                setDialogState(() {
-                                  _selectedStationIds = val == true ? ['ALL'] : [];
-                                });
-                              },
-                            );
-                          }),
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  value: isAllSelected,
+                                  onChanged: (val) {
+                                    setDialogState(() {
+                                      _selectedStationIds = val == true
+                                          ? ['ALL']
+                                          : [];
+                                    });
+                                  },
+                                );
+                              }),
 
                           const Divider(),
 
@@ -1874,11 +1981,16 @@ class _ReportsScreen extends State<ReportsScreen> {
                           ..._groupStationsByRegion().entries.map((entry) {
                             final regionName = entry.key;
                             final regionStations = entry.value;
-                            
+
                             // Check if ALL stations in this region are selected
-                            final regionStationIds = regionStations.map((s) => s['station_id'].toString()).toList();
-                            bool isRegionFullySelected = regionStationIds.isNotEmpty && 
-                                regionStationIds.every((id) => _selectedStationIds.contains(id));
+                            final regionStationIds = regionStations
+                                .map((s) => s['station_id'].toString())
+                                .toList();
+                            bool isRegionFullySelected =
+                                regionStationIds.isNotEmpty &&
+                                regionStationIds.every(
+                                  (id) => _selectedStationIds.contains(id),
+                                );
 
                             return Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1903,28 +2015,37 @@ class _ReportsScreen extends State<ReportsScreen> {
                                       if (val == true) {
                                         // Select all in region
                                         for (var id in regionStationIds) {
-                                          if (!_selectedStationIds.contains(id)) {
+                                          if (!_selectedStationIds.contains(
+                                            id,
+                                          )) {
                                             _selectedStationIds.add(id);
                                           }
                                         }
                                       } else {
                                         // Deselect all in region
-                                        _selectedStationIds.removeWhere((id) => regionStationIds.contains(id));
+                                        _selectedStationIds.removeWhere(
+                                          (id) => regionStationIds.contains(id),
+                                        );
                                       }
                                     });
                                   },
                                 ),
-                                
+
                                 // Individual Stations (Indented)
                                 ...regionStations.map((station) {
                                   final sName = station['name'] ?? '';
-                                  final String sIdStr = station['station_id'].toString();
-                                  bool isSelected = _selectedStationIds.contains(sIdStr);
+                                  final String sIdStr = station['station_id']
+                                      .toString();
+                                  bool isSelected = _selectedStationIds
+                                      .contains(sIdStr);
 
                                   return Padding(
                                     padding: const EdgeInsets.only(left: 24.0),
                                     child: CheckboxListTile(
-                                      title: Text(sName, style: const TextStyle(fontSize: 13)),
+                                      title: Text(
+                                        sName,
+                                        style: const TextStyle(fontSize: 13),
+                                      ),
                                       value: isSelected,
                                       dense: true,
                                       onChanged: (val) {
@@ -1986,7 +2107,7 @@ class _ReportsScreen extends State<ReportsScreen> {
     }
 
     return InkWell(
-      onTap: _showStationSelectionDialog,
+      onTap: AppConfig.isHoConfig ? _showStationSelectionDialog : null,
       child: Container(
         width: isMobile ? double.infinity : 250,
         height: 48,
@@ -2014,7 +2135,8 @@ class _ReportsScreen extends State<ReportsScreen> {
                 ),
               ),
             ),
-            const Icon(Icons.arrow_drop_down, color: Colors.grey),
+            if (AppConfig.isHoConfig)
+              const Icon(Icons.arrow_drop_down, color: Colors.grey),
           ],
         ),
       ),
@@ -2316,6 +2438,81 @@ class _ReportsScreen extends State<ReportsScreen> {
     }
   }
 
+  Widget _buildSearchField({
+    required TextEditingController controller,
+    required String hint,
+    required IconData icon,
+    required Function(String) onChanged,
+    bool isMobile = false,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      height: isMobile ? 45 : 50,
+      decoration: BoxDecoration(
+        color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey[100],
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: (isDark ? Colors.white : Colors.black).withOpacity(0.05),
+        ),
+      ),
+      child: TextField(
+        controller: controller,
+        onChanged: onChanged,
+        style: const TextStyle(fontSize: 14),
+        decoration: InputDecoration(
+          hintText: hint,
+          prefixIcon: Icon(icon, size: 18, color: Colors.teal),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(vertical: 12),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilterDropdown({
+    required String value,
+    required List<String> items,
+    required String label,
+    required IconData icon,
+    required ValueChanged<String?> onChanged,
+    bool isMobile = false,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      height: isMobile ? 45 : 50,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey[100],
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: (isDark ? Colors.white : Colors.black).withOpacity(0.05),
+        ),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: items.contains(value) ? value : "ALL",
+          items: items.map((String type) {
+            return DropdownMenuItem<String>(
+              value: type,
+              child: Text(
+                type,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            );
+          }).toList(),
+          onChanged: onChanged,
+          icon: const Icon(Icons.arrow_drop_down, color: Colors.teal),
+          isExpanded: true,
+          dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+          hint: Text(label, style: const TextStyle(fontSize: 12)),
+        ),
+      ),
+    );
+  }
+
   Future<void> _exportDetail() async {
     if (_selectedStationIds.isEmpty) {
       _showStationRequiredSnackBar();
@@ -2325,7 +2522,9 @@ class _ReportsScreen extends State<ReportsScreen> {
       SalesLoadStatus(data: _salesData, progress: 0.0, isLoading: true),
     );
     try {
-      await exportSaleDetailReport(List<Map<String, dynamic>>.from(_salesData));
+      await exportSaleDetailReport(
+        List<Map<String, dynamic>>.from(_filteredSalesData),
+      );
     } finally {
       salesStreamController.add(
         SalesLoadStatus(data: _salesData, progress: 1.0, isLoading: false),
@@ -2338,13 +2537,13 @@ class _ReportsScreen extends State<ReportsScreen> {
       _showStationRequiredSnackBar();
       return;
     }
-    
-    final stName = _selectedStationIds.contains('ALL') 
+
+    final stName = _selectedStationIds.contains('ALL')
         ? "ALL STATIONS"
         : _getEffectiveSelectedStations().map((e) => e['name']).join(", ");
 
     exportSaleDataReport(
-      _salesData.toList(),
+      _filteredSalesData.toList(),
       stName,
       "${DateFormat('dd-MM-yyyy').format(_selectedDateRange!.start)} ${_startTimeController.text}",
       "${DateFormat('dd-MM-yyyy').format(_selectedDateRange!.end)} ${_endTimeController.text}",
@@ -2377,45 +2576,6 @@ class _ReportsScreen extends State<ReportsScreen> {
         ),
         _infoRow("Record", "${data.length}"),
       ],
-    );
-  }
-
-  Widget _buildSearchField({
-    required TextEditingController controller,
-    required String hint,
-    required IconData icon,
-    required Function(String) onChanged,
-    bool isMobile = false,
-  }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      height: isMobile ? 50 : 45,
-      decoration: BoxDecoration(
-        color: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.02),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: (isDark ? Colors.white : Colors.black).withOpacity(0.1)),
-      ),
-      child: TextField(
-        controller: controller,
-        onChanged: onChanged,
-        style: const TextStyle(fontSize: 14),
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: TextStyle(color: isDark ? Colors.white38 : Colors.black38, fontSize: 13),
-          prefixIcon: Icon(icon, size: 18, color: Colors.teal),
-          suffixIcon: controller.text.isNotEmpty
-              ? IconButton(
-                  icon: const Icon(Icons.clear, size: 16),
-                  onPressed: () {
-                    controller.clear();
-                    onChanged("");
-                  },
-                )
-              : null,
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(vertical: 12),
-        ),
-      ),
     );
   }
 

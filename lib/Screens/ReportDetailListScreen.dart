@@ -27,6 +27,7 @@ class _ReportDetailListScreenState extends State<ReportDetailListScreen> {
   final TextEditingController _maxLiterController = TextEditingController();
   String _selectedFuelType = 'All';
   String _selectedCategory = 'All';
+  String _selectedSaleType = 'All';
   String _sortBy = 'Time'; // 'Time', 'Liter', 'Amount'
   bool _isAscending = false;
   bool _showOnlyDuplicates = false;
@@ -72,6 +73,10 @@ class _ReportDetailListScreenState extends State<ReportDetailListScreen> {
         final matchesCategory =
             _selectedCategory == 'All' || category == _selectedCategory;
 
+        final saleType = sale['Sale_Type_name'] ?? '';
+        final matchesSaleType =
+            _selectedSaleType == 'All' || saleType == _selectedSaleType;
+
         // Liter Range Filter
         final literValue = double.tryParse(sale['SALELITER']?.toString() ?? '0') ?? 0;
         final minLiter = double.tryParse(_minLiterController.text) ?? 0;
@@ -84,7 +89,12 @@ class _ReportDetailListScreenState extends State<ReportDetailListScreen> {
         final isDuplicate = _duplicateVehicles.contains(vehNoRaw.trim());
         final matchesDuplicate = !_showOnlyDuplicates || isDuplicate;
 
-        return matchesSearch && matchesFuel && matchesCategory && matchesLiterRange && matchesDuplicate;
+        return matchesSearch &&
+            matchesFuel &&
+            matchesCategory &&
+            matchesSaleType &&
+            matchesLiterRange &&
+            matchesDuplicate;
       }).toList();
 
       // Apply Sorting
@@ -126,6 +136,16 @@ class _ReportDetailListScreenState extends State<ReportDetailListScreen> {
         .toList();
     cats.sort();
     return ['All', ...cats];
+  }
+
+  List<String> _getSaleTypes() {
+    final types = widget.salesData
+        .map((e) => (e['Sale_Type_name'] ?? '').toString())
+        .where((e) => e.isNotEmpty)
+        .toSet()
+        .toList();
+    types.sort();
+    return ['All', ...types];
   }
 
   @override
@@ -304,6 +324,57 @@ class _ReportDetailListScreenState extends State<ReportDetailListScreen> {
                             borderRadius: BorderRadius.circular(16),
                             side: BorderSide(
                               color: isSelected ? Colors.blue : Colors.grey.withValues(alpha: 0.3),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 8),
+                // Sale Type Filter Chips
+                SizedBox(
+                  height: 34,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: _getSaleTypes().length,
+                    itemBuilder: (context, index) {
+                      final saleTypes = _getSaleTypes();
+                      final type = saleTypes[index];
+                      final isSelected = _selectedSaleType == type;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: FilterChip(
+                          avatar: Icon(
+                            Icons.payments_outlined,
+                            size: 14,
+                            color: isSelected ? getSaleTypeColor(type) : (isDark ? Colors.white54 : Colors.black54),
+                          ),
+                          label: Text(type),
+                          selected: isSelected,
+                          onSelected: (selected) {
+                            setState(() {
+                              _selectedSaleType = type;
+                              _applyFilters();
+                            });
+                          },
+                          backgroundColor: Colors.transparent,
+                          selectedColor: getSaleTypeColor(type).withValues(alpha: 0.1),
+                          checkmarkColor: getSaleTypeColor(type),
+                          labelStyle: TextStyle(
+                            color: isSelected
+                                ? getSaleTypeColor(type)
+                                : (isDark ? Colors.white70 : Colors.black87),
+                            fontWeight: isSelected
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                            fontSize: 11,
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            side: BorderSide(
+                              color: isSelected ? getSaleTypeColor(type) : Colors.grey.withValues(alpha: 0.3),
                             ),
                           ),
                         ),
