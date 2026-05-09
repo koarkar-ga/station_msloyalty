@@ -114,7 +114,7 @@ class _SetupScreenState extends State<SetupScreen> {
       // 2. Fetch Server Config
       final config = await supabase
           .from('auth')
-          .select('db_host, db_user, db_pass, db_name, api_url')
+          .select('db_host, db_user, db_pass, db_name, api_url, db_port')
           .eq('station_code', 'ALL')
           .limit(1)
           .maybeSingle();
@@ -140,6 +140,39 @@ class _SetupScreenState extends State<SetupScreen> {
       _showError(e.toString());
     } finally {
       if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  Future<void> _fetchPredefinedConfig(String stationId) async {
+    setState(() => _isLoadingStations = true);
+    try {
+      final config = await supabase
+          .from('auth')
+          .select('db_host, db_user, db_pass, db_name, api_url, db_port')
+          .eq('station_code', stationId)
+          .limit(1)
+          .maybeSingle();
+
+      if (config != null) {
+        setState(() {
+          _hostController.text = config['db_host'] ?? _hostController.text;
+          _userController.text = config['db_user'] ?? _userController.text;
+          _passController.text = config['db_pass'] ?? _passController.text;
+          _dbController.text = config['db_name'] ?? _dbController.text;
+          _apiController.text = config['api_url'] ?? _apiController.text;
+          _portController.text = config['db_port']?.toString() ?? _portController.text;
+        });
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Pre-defined configuration applied."), backgroundColor: Colors.blue),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint("Error fetching predefined config: $e");
+    } finally {
+      setState(() => _isLoadingStations = false);
     }
   }
 
@@ -326,6 +359,7 @@ class _SetupScreenState extends State<SetupScreen> {
                 _nameController.text = val!;
                 _idController.text = _stations.firstWhere((s) => s['name'] == val)['station_id']!;
               });
+              _fetchPredefinedConfig(_idController.text);
             },
             validator: (v) => v == null ? "Required" : null,
           ),

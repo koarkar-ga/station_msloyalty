@@ -9,6 +9,7 @@ import 'package:station_msloyalty/LoyaltyReportScreen.dart';
 import 'package:station_msloyalty/login_page.dart';
 import 'package:station_msloyalty/Screens/StockReportScreen.dart';
 import 'package:station_msloyalty/Services/ActivityService.dart';
+import 'package:station_msloyalty/screens/admin/station_status_screen.dart';
 
 class AppLauncherScreen extends StatelessWidget {
   const AppLauncherScreen({super.key});
@@ -16,7 +17,7 @@ class AppLauncherScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.blueGrey[50],
       appBar: AppBar(
@@ -32,13 +33,14 @@ class AppLauncherScreen extends StatelessWidget {
               // Log Login Activity
               await ActivityService.logActivity(
                 actionType: 'login',
-                description: 'User ${AppConfig.currentUserName} logged in at ${AppConfig.stationName}',
+                description:
+                    'User ${AppConfig.currentUserName} logged in at ${AppConfig.stationName}',
               );
-              
+
               AppConfig.currentUserLevel = 11;
               AppConfig.currentUserId = null;
               AppConfig.currentUserName = null;
-              
+
               Navigator.of(context).pushAndRemoveUntil(
                 MaterialPageRoute(builder: (context) => const LoginPage()),
                 (route) => false,
@@ -70,7 +72,8 @@ class AppLauncherScreen extends StatelessWidget {
                 crossAxisSpacing: spacing,
                 mainAxisSpacing: spacing,
                 children: [
-                  if (AppConfig.permissions['Dashboard'] == true || AppConfig.currentUserLevel == 1)
+                  if (AppConfig.permissions['Dashboard'] == true ||
+                      AppConfig.currentUserLevel == 1)
                     _buildMenuButton(
                       context,
                       icon: Icons.dashboard_rounded,
@@ -78,11 +81,14 @@ class AppLauncherScreen extends StatelessWidget {
                       color: Colors.blue,
                       onTap: () {
                         Navigator.of(context).push(
-                          MaterialPageRoute(builder: (context) => DashboardScreen()),
+                          MaterialPageRoute(
+                            builder: (context) => DashboardScreen(),
+                          ),
                         );
                       },
                     ),
-                  if (AppConfig.permissions['Collect Point'] == true || AppConfig.currentUserLevel == 1)
+                  if (AppConfig.permissions['Collect Point'] == true ||
+                      AppConfig.currentUserLevel == 1)
                     _buildMenuButton(
                       context,
                       icon: Icons.add_chart_rounded,
@@ -97,7 +103,8 @@ class AppLauncherScreen extends StatelessWidget {
                         );
                       },
                     ),
-                  if (AppConfig.permissions['Reward Point'] == true || AppConfig.currentUserLevel == 1)
+                  if (AppConfig.permissions['Reward Point'] == true ||
+                      AppConfig.currentUserLevel == 1)
                     _buildMenuButton(
                       context,
                       icon: Icons.card_giftcard_rounded,
@@ -112,7 +119,8 @@ class AppLauncherScreen extends StatelessWidget {
                         );
                       },
                     ),
-                  if (AppConfig.permissions['Reports'] == true || AppConfig.currentUserLevel == 1)
+                  if (AppConfig.permissions['Reports'] == true ||
+                      AppConfig.currentUserLevel == 1)
                     _buildMenuButton(
                       context,
                       icon: Icons.assessment,
@@ -126,7 +134,8 @@ class AppLauncherScreen extends StatelessWidget {
                         );
                       },
                     ),
-                  if (AppConfig.permissions['Loyalty Reports'] == true || AppConfig.currentUserLevel == 1)
+                  if (AppConfig.permissions['Loyalty Reports'] == true ||
+                      AppConfig.currentUserLevel == 1)
                     _buildMenuButton(
                       context,
                       icon: Icons.pie_chart_rounded,
@@ -141,7 +150,8 @@ class AppLauncherScreen extends StatelessWidget {
                         );
                       },
                     ),
-                  if (AppConfig.permissions['Reports'] == true || AppConfig.currentUserLevel == 1)
+                  if (AppConfig.permissions['Reports'] == true ||
+                      AppConfig.currentUserLevel == 1)
                     _buildMenuButton(
                       context,
                       icon: Icons.inventory_2_rounded,
@@ -156,7 +166,8 @@ class AppLauncherScreen extends StatelessWidget {
                         );
                       },
                     ),
-                  if (AppConfig.permissions['Settings'] == true || AppConfig.currentUserLevel == 1)
+                  if (AppConfig.permissions['Settings'] == true ||
+                      AppConfig.currentUserLevel == 1)
                     _buildMenuButton(
                       context,
                       icon: Icons.settings,
@@ -166,6 +177,21 @@ class AppLauncherScreen extends StatelessWidget {
                         Navigator.of(context).push(
                           MaterialPageRoute(
                             builder: (context) => const SettingsScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                  if (AppConfig.permissions['Station Status'] == true ||
+                      AppConfig.currentUserLevel == 1)
+                    _buildMenuButton(
+                      context,
+                      icon: Icons.radio_button_checked,
+                      label: "Station Status",
+                      color: Colors.green,
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => const StationStatusScreen(),
                           ),
                         );
                       },
@@ -210,7 +236,9 @@ class AppLauncherScreen extends StatelessWidget {
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
-              color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87,
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.white
+                  : Colors.black87,
             ),
           ),
         ],

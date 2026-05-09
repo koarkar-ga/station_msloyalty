@@ -4,6 +4,8 @@ import 'package:station_msloyalty/AppConfig.dart';
 import 'package:station_msloyalty/Model/AppSettings.dart';
 import 'package:station_msloyalty/Helper/InDevelopmentOverlay.dart';
 import 'package:station_msloyalty/Services/FuelPriceService.dart';
+import 'package:station_msloyalty/Screens/SensorMonitorScreen.dart';
+import 'package:station_msloyalty/SetupScreen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -93,10 +95,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _stations = List<Map<String, dynamic>>.from(response);
           // အကယ်၍ Admin User ဖြစ်လျှင် ALL STATIONS ကို ထည့်ပေးမယ်
           if (AppConfig.currentUserLevel == 1) {
-            _stations.insert(0, {
-              'station_id': 'ALL',
-              'name': 'ALL STATIONS',
-            });
+            _stations.insert(0, {'station_id': 'ALL', 'name': 'ALL STATIONS'});
           }
           _isLoadingStations = false;
         });
@@ -104,9 +103,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoadingStations = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error fetching stations: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error fetching stations: $e')));
       }
     }
   }
@@ -246,6 +245,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
         'icon': Icons.person_outline,
         'selectedIcon': Icons.person,
         'body': _buildAccountSettings(),
+      },
+      {
+        'label': 'Sensors',
+        'icon': Icons.sensors_outlined,
+        'selectedIcon': Icons.sensors,
+        'body': const SensorMonitorScreen(),
       },
       {
         'label': 'Server Config',
@@ -697,6 +702,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
           const SizedBox(height: 40),
+          const Divider(),
+          const SizedBox(height: 20),
+          Text(
+            "System Maintenance",
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Colors.redAccent[700],
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _showResetConfirmation,
+              icon: const Icon(Icons.refresh),
+              label: const Text("Reset App Configuration"),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.redAccent,
+                side: const BorderSide(color: Colors.redAccent),
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 60),
         ],
       ),
     );
@@ -763,6 +795,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
           filled: readOnly,
           fillColor: readOnly ? Colors.grey[100] : null,
         ),
+      ),
+    );
+  }
+
+  void _showResetConfirmation() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Reset App Configuration?"),
+        content: const Text(
+          "This will delete all local settings and return the app to its initial state. Are you sure?",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await AppConfig.resetConfig();
+              if (mounted) {
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (context) => const SetupScreen()),
+                  (route) => false,
+                );
+              }
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text("Reset Everything"),
+          ),
+        ],
       ),
     );
   }

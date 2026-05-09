@@ -206,4 +206,17 @@ class AppConfig {
       print("Error updating pos-api config: $e");
     }
   }
+
+  static Future<void> resetConfig() async {
+    try {
+      await isar.writeTxn(() async {
+        await isar.appSettings.clear();
+      });
+      configExists = false;
+      print("Configuration Reset Successful.");
+    } catch (e) {
+      print("Error resetting config: $e");
+      rethrow;
+    }
+  }
 }
