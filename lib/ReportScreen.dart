@@ -416,14 +416,10 @@ class _ReportsScreen extends State<ReportsScreen> {
           ),
         );
 
-        // API Call for this station
-        final stationUrl =
-            '${AppConfig.apiUrl}/api/sales/search?startDate=$startStr&endDate=$endStr&stationId=$sId';
-
-        final originalId = AppConfig.stationId;
-        final originalDb = AppConfig.database;
-        AppConfig.stationId = sId;
-        AppConfig.database = sId;
+        // API Call for this station - In Station mode, we don't want to override the database name with the station ID
+        final stationUrl = AppConfig.isHoConfig
+            ? '${AppConfig.apiUrl}/api/sales/search?startDate=$startStr&endDate=$endStr&stationId=$sId'
+            : '${AppConfig.apiUrl}/api/sales/search?startDate=$startStr&endDate=$endStr';
 
         List<dynamic> stationSales = [];
         await fetchWithProgress(
@@ -432,10 +428,12 @@ class _ReportsScreen extends State<ReportsScreen> {
           salesStreamController,
           stationProgress: progressList,
           stayLoading: i < targetStations.length - 1,
+          headers: {
+            ...AppConfig.headers,
+            if (AppConfig.isHoConfig)
+              'x-station-id': sId, // Only override in HO mode
+          },
         );
-
-        AppConfig.stationId = originalId;
-        AppConfig.database = originalDb;
 
         for (var sale in stationSales) {
           sale['station_id'] = sId;
@@ -485,17 +483,15 @@ class _ReportsScreen extends State<ReportsScreen> {
         final sName = station['name'];
 
         final url = Uri.parse(
-          '${AppConfig.apiUrl}/api/system-control/search?start=$startStr&end=$endStr&stationId=$sId',
+          AppConfig.isHoConfig
+              ? '${AppConfig.apiUrl}/api/system-control/search?start=$startStr&end=$endStr&stationId=$sId'
+              : '${AppConfig.apiUrl}/api/system-control/search?start=$startStr&end=$endStr',
         );
 
-        final originalId = AppConfig.stationId;
-        final originalDb = AppConfig.database;
-        AppConfig.stationId = sId;
-        AppConfig.database = sId;
-
-        final response = await http.get(url, headers: AppConfig.headers);
-        AppConfig.stationId = originalId;
-        AppConfig.database = originalDb;
+        final response = await http.get(url, headers: {
+          ...AppConfig.headers,
+          if (AppConfig.isHoConfig) 'x-station-id': sId,
+        });
 
         if (response.statusCode == 200) {
           final List<dynamic> data = json.decode(response.body);
@@ -591,18 +587,19 @@ class _ReportsScreen extends State<ReportsScreen> {
       _salesData.clear();
       for (var station in targetStations) {
         final sId = station['station_id'];
-        final dynamicUrl = '$apiUrl?stationId=$sId';
-
-        final originalId = AppConfig.stationId;
-        final originalDb = AppConfig.database;
-        AppConfig.stationId = sId;
-        AppConfig.database = sId;
+        final dynamicUrl = AppConfig.isHoConfig
+            ? '$apiUrl?stationId=$sId'
+            : apiUrl;
 
         final List<dynamic> stationLatestSales = [];
         await fetchWithProgress(
           dynamicUrl,
           stationLatestSales,
           salesStreamController,
+          headers: {
+            ...AppConfig.headers,
+            if (AppConfig.isHoConfig) 'x-station-id': sId,
+          },
         );
 
         // Normalize dates and add station info
@@ -614,9 +611,6 @@ class _ReportsScreen extends State<ReportsScreen> {
           sale['station_name'] = station['name'];
         }
         _salesData.addAll(stationLatestSales);
-
-        AppConfig.stationId = originalId;
-        AppConfig.database = originalDb;
       }
     } catch (e) {
       debugPrint("Fetch Error: $e");

@@ -745,22 +745,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final station = _stations.firstWhere((s) => s['station_id'] == stationId);
       _nameController.text = station['name'] ?? '';
       _idController.text = station['station_id'] ?? '';
-      _dbController.text =
-          station['station_id'] ?? ''; // DB Name becomes Station ID
+      _dbController.text = station['station_id'] ?? ''; // Default DB Name to Station ID
 
-      // 2. Fetch connection details from the auth table for 'ALL' stations
-      // This is the central HO server config we set up in the previous step.
-      final hoConfig = await Supabase.instance.client
+      // 2. Fetch connection details from the auth table for this specific station first, 
+      // then fall back to 'ALL' for other settings.
+      final stationConfig = await Supabase.instance.client
           .from('auth')
           .select('*')
-          .eq('station_code', 'ALL')
+          .eq('station_code', stationId)
           .maybeSingle();
 
-      if (hoConfig != null) {
-        _hostController.text = hoConfig['db_host'] ?? _hostController.text;
-        _userController.text = hoConfig['db_user'] ?? _userController.text;
-        _passController.text = hoConfig['db_pass'] ?? _passController.text;
-        _apiController.text = hoConfig['api_url'] ?? _apiController.text;
+      if (stationConfig != null) {
+        _hostController.text = stationConfig['db_host'] ?? _hostController.text;
+        _userController.text = stationConfig['db_user'] ?? _userController.text;
+        _passController.text = stationConfig['db_pass'] ?? _passController.text;
+        _dbController.text = stationConfig['db_name'] ?? _dbController.text;
+        _apiController.text = stationConfig['api_url'] ?? _apiController.text;
+      } else {
+        // Fallback to HO global config for connection details if station-specific config doesn't exist
+        final hoConfig = await Supabase.instance.client
+            .from('auth')
+            .select('*')
+            .eq('station_code', 'ALL')
+            .maybeSingle();
+
+        if (hoConfig != null) {
+          _hostController.text = hoConfig['db_host'] ?? _hostController.text;
+          _userController.text = hoConfig['db_user'] ?? _userController.text;
+          _passController.text = hoConfig['db_pass'] ?? _passController.text;
+          _apiController.text = hoConfig['api_url'] ?? _apiController.text;
+        }
       }
 
       // Sync Station ID to pos-api config.ini if in HO mode
@@ -844,6 +858,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         dbName: _dbController.text,
         api: _apiController.text,
       );
+
+      // Sync the manually entered Database Name to pos-api config.ini
+      await AppConfig.updatePosApiConfig(_dbController.text);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

@@ -356,8 +356,10 @@ class _SetupScreenState extends State<SetupScreen> {
             onChanged: (val) {
               setState(() {
                 _selectedStationName = val;
+                final stationId = _stations.firstWhere((s) => s['name'] == val)['station_id']!;
                 _nameController.text = val!;
-                _idController.text = _stations.firstWhere((s) => s['name'] == val)['station_id']!;
+                _idController.text = stationId;
+                _dbController.text = stationId; // Default DB Name to Station ID
               });
               _fetchPredefinedConfig(_idController.text);
             },

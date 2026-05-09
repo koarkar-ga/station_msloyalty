@@ -11,14 +11,16 @@ Future<void> fetchWithProgress(
   StreamController<SalesLoadStatus> controller, {
   List<Map<String, dynamic>>? stationProgress,
   bool stayLoading = false,
+  Map<String, String>? headers,
 }) async {
   HttpClient client = HttpClient();
   
   try {
     HttpClientRequest request = await client.getUrl(Uri.parse(apiUrl));
 
-    // Add headers from AppConfig
-    AppConfig.headers.forEach((key, value) {
+    // Add headers (either passed or from AppConfig)
+    final effectiveHeaders = headers ?? AppConfig.headers;
+    effectiveHeaders.forEach((key, value) {
       request.headers.set(key, value);
     });
 

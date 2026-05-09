@@ -2,6 +2,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/material.dart';
+import 'dart:io';
 
 class UpdateService {
   final supabase = Supabase.instance.client;
@@ -15,6 +16,7 @@ class UpdateService {
       final response = await supabase
           .from('app_versions')
           .select()
+          .eq('app_type', 'station_app')
           .order('created_at', ascending: false)
           .limit(1)
           .maybeSingle();
@@ -24,16 +26,24 @@ class UpdateService {
       final String latestVersion = response['version_code'];
       final int latestBuildNumber = response['build_number'];
       final bool isMandatory = response['is_mandatory'] ?? false;
-      final String? windowsUrl = response['windows_url'];
       final String releaseNotes = response['release_notes'] ?? '';
+
+      String? downloadUrl;
+      if (Platform.isAndroid) {
+        downloadUrl = response['android_url'];
+      } else if (Platform.isWindows) {
+        downloadUrl = response['windows_url'];
+      } else if (Platform.isIOS) {
+        downloadUrl = response['ios_url'];
+      }
 
       debugPrint('Current Version: $currentVersion ($currentBuildNumber)');
       debugPrint('Latest Version: $latestVersion ($latestBuildNumber)');
 
       if (latestBuildNumber > currentBuildNumber) {
-        debugPrint('Update found! Version: $latestVersion, Build: $latestBuildNumber, URL: $windowsUrl');
+        debugPrint('Update found! Version: $latestVersion, Build: $latestBuildNumber, URL: $downloadUrl');
         if (context.mounted) {
-          await _showUpdateDialog(context, latestVersion, releaseNotes, windowsUrl, isMandatory);
+          await _showUpdateDialog(context, latestVersion, releaseNotes, downloadUrl, isMandatory);
         }
       } else {
         debugPrint('No updates available. Current build: $currentBuildNumber, Latest build: $latestBuildNumber');

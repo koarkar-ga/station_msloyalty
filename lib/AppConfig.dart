@@ -20,21 +20,21 @@ class AppConfig {
   static String apiHealthUrl = "${AppConfig.apiUrl}/api/health";
   static int currentUserLevel = 11; // Default to basic level
   static String? currentUserId;
-    static String? currentUserName;
+  static String? currentUserName;
   static Map<String, bool> permissions = {};
 
   static Map<String, String> get headers => {
     'Content-Type': 'application/json',
-    'x-station-id': stationId,
+    'x-station-id': database, // The API uses this header to select the database
   };
 
   static Future<void> loadConfig() async {
     try {
       final dir = await getApplicationSupportDirectory();
-      isar = await Isar.open(
-        [AppSettingsSchema, OfflineTransactionSchema],
-        directory: dir.path,
-      );
+      isar = await Isar.open([
+        AppSettingsSchema,
+        OfflineTransactionSchema,
+      ], directory: dir.path);
 
       final settings = await isar.appSettings.where().findFirst();
 
@@ -184,14 +184,8 @@ class AppConfig {
         }
 
         if (isInDatabaseSection && trimmedLine.startsWith('database')) {
-          final parts = line.split('=');
-          if (parts.length == 2) {
-            final currentValue = parts[1].trim();
-            if (currentValue == 'HO') {
-              isUpdated = true;
-              return "${parts[0]}= $newDbName";
-            }
-          }
+          isUpdated = true;
+          return "database = $newDbName";
         }
         return line;
       }).toList();
