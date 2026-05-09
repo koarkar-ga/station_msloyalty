@@ -37,6 +37,7 @@ class _MsAppBarState extends State<MsAppBar> {
 
   bool _isApiOnline = false;
   bool _isEhoUpdate = false;
+  String _apiError = "";
   Timer? _timer;
   int _ehoRemainingToSendCount = 0;
 
@@ -61,10 +62,27 @@ class _MsAppBarState extends State<MsAppBar> {
           .get(Uri.parse(AppConfig.apiHealthUrl))
           .timeout(const Duration(seconds: 3));
       if (response.statusCode == 200) {
-        if (mounted) setState(() => _isApiOnline = true);
+        if (mounted) {
+          setState(() {
+            _isApiOnline = true;
+            _apiError = "";
+          });
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            _isApiOnline = false;
+            _apiError = "HTTP ${response.statusCode}: ${response.reasonPhrase}";
+          });
+        }
       }
     } catch (e) {
-      if (mounted) setState(() => _isApiOnline = false);
+      if (mounted) {
+        setState(() {
+          _isApiOnline = false;
+          _apiError = e.toString();
+        });
+      }
     }
     return _isApiOnline;
   }
@@ -248,12 +266,63 @@ class _MsAppBarState extends State<MsAppBar> {
         ),
         if (!compact) ...[
           const SizedBox(width: 8),
-          Text(
-            _isApiOnline ? "API ONLINE" : "API OFFLINE",
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-              color: _isApiOnline ? Colors.greenAccent : Colors.redAccent,
+          GestureDetector(
+            onTap: _isApiOnline
+                ? null
+                : () {
+                    showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Row(
+                          children: [
+                            Icon(Icons.error, color: Colors.red),
+                            SizedBox(width: 10),
+                            Text("API Connection Error"),
+                          ],
+                        ),
+                        content: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text("The app cannot connect to the POS API server.", style: TextStyle(fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 10),
+                            Text("URL: ${AppConfig.apiHealthUrl}"),
+                            const SizedBox(height: 10),
+                            const Text("Error Details:", style: TextStyle(fontSize: 12, color: Colors.grey)),
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.black12,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(_apiError, style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
+                            ),
+                          ],
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text("Close"),
+                          ),
+                          ElevatedButton(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              checkApiConnection();
+                            },
+                            child: const Text("Retry"),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+            child: Text(
+              _isApiOnline ? "API ONLINE" : "API OFFLINE",
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: _isApiOnline ? Colors.greenAccent : Colors.redAccent,
+                decoration: _isApiOnline ? null : TextDecoration.underline,
+              ),
             ),
           ),
         ],

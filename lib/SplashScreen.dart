@@ -102,26 +102,57 @@ class _SplashScreenState extends State<SplashScreen> {
         return;
       }
 
+      // 1. Cloud Connection
       if (mounted) setState(() => _loadingStatus = "Connecting to Cloud...");
       bool isSupabaseOk = await checkSupabaseConnection();
       if (!isSupabaseOk) throw "Cloud Server Connection Failed!";
 
-      if (mounted) {
-        setState(() => _loadingStatus = "Connecting to Local API...");
-      }
-      bool isApiOk = await checkApiConnection();
-      if (!isApiOk) throw "API Server Connection Failed!";
+      // 2. Local API Connection (Infinite Retry until success)
+      int retryCount = 0;
+      bool isApiOk = false;
 
+      while (!isApiOk) {
+        if (mounted) {
+          setState(() {
+            if (retryCount == 0) {
+              _loadingStatus = "Connecting to Local API...";
+            } else {
+              _loadingStatus = "API Offline. Retrying ($retryCount)...";
+            }
+          });
+        }
+        
+        try {
+          isApiOk = await checkApiConnection();
+        } catch (e) {
+          retryCount++;
+          // အကယ်၍ ၁၀ ကြိမ်ထက်ပိုပြီး မရဘူးဆိုရင် Setup ပြန်လုပ်ဖို့ Dialog ပြပေးမယ်
+          if (retryCount >= 10) {
+             throw "API Connection failed after multiple attempts. Please check your server and network.";
+          }
+          await Future.delayed(const Duration(seconds: 5));
+        }
+      }
+
+      // 3. Data Sync (Optional, don't block if fails)
       if (mounted) setState(() => _loadingStatus = "Syncing Local Catalog...");
       try {
         await syncSaleTypes().timeout(const Duration(seconds: 5));
         await syncFuelTypes().timeout(const Duration(seconds: 5));
-      } catch (e) {}
+      } catch (e) {
+        debugPrint("Sync Error (Non-blocking): $e");
+      }
 
+      // 4. Update Check
       if (mounted) setState(() => _loadingStatus = "Checking for Updates...");
       if (!mounted) return;
-      await UpdateService().checkForUpdates(context);
+      try {
+        await UpdateService().checkForUpdates(context).timeout(const Duration(seconds: 10));
+      } catch (e) {
+        debugPrint("Update Check Error (Non-blocking): $e");
+      }
 
+      // 5. Final Launch
       if (mounted) setState(() => _loadingStatus = "Launching Station App...");
       await Future.delayed(const Duration(milliseconds: 500));
 
