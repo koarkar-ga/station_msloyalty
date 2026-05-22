@@ -8,8 +8,10 @@ import 'package:station_msloyalty/DashboardScreen.dart';
 import 'package:station_msloyalty/LoyaltyReportScreen.dart';
 import 'package:station_msloyalty/login_page.dart';
 import 'package:station_msloyalty/Screens/StockReportScreen.dart';
+import 'package:station_msloyalty/Screens/ComparisonReportScreen.dart';
 import 'package:station_msloyalty/Services/ActivityService.dart';
 import 'package:station_msloyalty/screens/admin/station_status_screen.dart';
+import 'package:station_msloyalty/Screens/FuelPosScreen.dart';
 
 class AppLauncherScreen extends StatelessWidget {
   const AppLauncherScreen({super.key});
@@ -103,6 +105,22 @@ class AppLauncherScreen extends StatelessWidget {
                         );
                       },
                     ),
+                  if (AppConfig.permissions['Collect Point'] == true ||
+                      AppConfig.currentUserLevel == 1)
+                    _buildMenuButton(
+                      context,
+                      icon: Icons.local_gas_station_rounded,
+                      label: "Fuel POS",
+                      color: Colors.greenAccent,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const FuelPosScreen(),
+                          ),
+                        );
+                      },
+                    ),
                   if (AppConfig.permissions['Reward Point'] == true ||
                       AppConfig.currentUserLevel == 1)
                     _buildMenuButton(
@@ -162,6 +180,22 @@ class AppLauncherScreen extends StatelessWidget {
                           context,
                           MaterialPageRoute(
                             builder: (context) => const StockReportScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                  if (AppConfig.permissions['Reports'] == true ||
+                      AppConfig.currentUserLevel == 1)
+                    _buildMenuButton(
+                      context,
+                      icon: Icons.compare_rounded,
+                      label: "Comparison",
+                      color: Colors.indigo,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const ComparisonReportScreen(),
                           ),
                         );
                       },

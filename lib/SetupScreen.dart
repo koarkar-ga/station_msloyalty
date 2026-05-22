@@ -23,12 +23,14 @@ class _SetupScreenState extends State<SetupScreen> {
     final _apiController = TextEditingController(text: "http://localhost:3000");
   final _portController = TextEditingController(text: "1433");
   final _hoPasswordController = TextEditingController();
+  final _stationPasswordController = TextEditingController();
 
   bool _isSaving = false;
   String _setupMode = 'none'; // 'none', 'ho', 'station'
   List<Map<String, dynamic>> _stations = [];
   bool _isLoadingStations = false;
   String? _selectedStationName;
+  bool _showManualConfig = false;
 
   Future<void> _handleSave() async {
     if (!_formKey.currentState!.validate()) return;
@@ -69,6 +71,7 @@ class _SetupScreenState extends State<SetupScreen> {
     _apiController.dispose();
     _portController.dispose();
     _hoPasswordController.dispose();
+    _stationPasswordController.dispose();
     super.dispose();
   }
 
@@ -133,6 +136,64 @@ class _SetupScreenState extends State<SetupScreen> {
         api: config['api_url'] ?? 'http://localhost:3000',
         dbPort: config['db_port']?.toString() ?? '1433',
         hoConfig: true,
+      );
+
+      _finalizeSetup();
+    } catch (e) {
+      _showError(e.toString());
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  Future<void> _handleStationAutoSetup() async {
+    if (_selectedStationName == null) {
+      _showError("Please select a station.");
+      return;
+    }
+    if (_stationPasswordController.text.isEmpty) {
+      _showError("Please enter the HO config password.");
+      return;
+    }
+
+    setState(() => _isSaving = true);
+    try {
+      // 1. Verify Password against Cloud DB system_settings
+      final pwdResponse = await supabase
+          .from('system_settings')
+          .select('value')
+          .eq('key', 'ho_config_password')
+          .maybeSingle();
+      
+      final authorizedPwd = pwdResponse?['value'] ?? 'msloyalty@ho';
+
+      if (_stationPasswordController.text != authorizedPwd) {
+        throw "Incorrect HO Configuration Password.";
+      }
+
+      // 2. Fetch Server Config
+      final stationId = _idController.text;
+      final config = await supabase
+          .from('auth')
+          .select('db_host, db_user, db_pass, db_name, api_url, db_port')
+          .eq('station_code', stationId)
+          .limit(1)
+          .maybeSingle();
+
+      if (config == null) {
+        throw "Station Connection parameters not found in Cloud Database. Please configure manually.";
+      }
+
+      await AppConfig.saveConfig(
+        name: _selectedStationName!,
+        id: stationId,
+        dbHost: config['db_host'] ?? 'localhost',
+        dbUser: config['db_user'] ?? 'sa',
+        dbPass: config['db_pass'] ?? '',
+        dbName: config['db_name'] ?? stationId,
+        api: config['api_url'] ?? 'http://localhost:3000',
+        dbPort: config['db_port']?.toString() ?? '1433',
+        hoConfig: false,
       );
 
       _finalizeSetup();
@@ -361,29 +422,59 @@ class _SetupScreenState extends State<SetupScreen> {
                 _idController.text = stationId;
                 _dbController.text = stationId; // Default DB Name to Station ID
               });
-              _fetchPredefinedConfig(_idController.text);
+              if (_showManualConfig) {
+                _fetchPredefinedConfig(_idController.text);
+              }
             },
             validator: (v) => v == null ? "Required" : null,
           ),
           const SizedBox(height: 16),
           _buildTextField(_idController, "Station ID", Icons.badge, readOnly: true),
           const SizedBox(height: 16),
-          _buildTextField(_hostController, "Database Hostname", Icons.cloud_queue),
-          _buildTextField(_dbController, "Database Name", Icons.storage),
-          _buildTextField(_userController, "DB Username", Icons.person),
-          _buildTextField(_portController, "DB Port", Icons.settings_input_component),
-          _buildTextField(_passController, "DB Password", Icons.lock, isPassword: true),
-          _buildTextField(_apiController, "Local API URL", Icons.link),
-          const SizedBox(height: 40),
-          SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: ElevatedButton(
-              onPressed: _isSaving ? null : _handleSave,
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent, foregroundColor: Colors.white),
-              child: _isSaving ? const CircularProgressIndicator(color: Colors.white) : const Text("Save & Start"),
+          if (!_showManualConfig) ...[
+            _buildTextField(_stationPasswordController, "HO Config Password", Icons.lock, isPassword: true),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton(
+                onPressed: _isSaving ? null : _handleStationAutoSetup,
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent, foregroundColor: Colors.white),
+                child: _isSaving ? const CircularProgressIndicator(color: Colors.white) : const Text("Verify & Auto Setup"),
+              ),
             ),
-          ),
+            const SizedBox(height: 16),
+            Center(
+              child: TextButton(
+                onPressed: () => setState(() => _showManualConfig = true),
+                child: const Text("Configure Manually (Custom Settings)", style: TextStyle(color: Colors.white70)),
+              ),
+            ),
+          ] else ...[
+            _buildTextField(_hostController, "Database Hostname", Icons.cloud_queue),
+            _buildTextField(_dbController, "Database Name", Icons.storage),
+            _buildTextField(_userController, "DB Username", Icons.person),
+            _buildTextField(_portController, "DB Port", Icons.settings_input_component),
+            _buildTextField(_passController, "DB Password", Icons.lock, isPassword: true),
+            _buildTextField(_apiController, "Local API URL", Icons.link),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton(
+                onPressed: _isSaving ? null : _handleSave,
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent, foregroundColor: Colors.white),
+                child: _isSaving ? const CircularProgressIndicator(color: Colors.white) : const Text("Save & Start"),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Center(
+              child: TextButton(
+                onPressed: () => setState(() => _showManualConfig = false),
+                child: const Text("Back to Auto Setup", style: TextStyle(color: Colors.white70)),
+              ),
+            ),
+          ],
         ],
       ),
     );
