@@ -26,6 +26,11 @@ class AppConfig {
   static Map<String, String> get headers => {
     'Content-Type': 'application/json',
     'x-station-id': database, // The API uses this header to select the database
+    'x-station-code': stationId,
+    'x-db-host': host,
+    'x-db-user': username,
+    'x-db-pass': password,
+    'x-db-port': port,
   };
 
   static Future<void> loadConfig() async {

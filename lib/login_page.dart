@@ -6,6 +6,7 @@ import 'package:station_msloyalty/Services/AuthService.dart';
 import 'package:station_msloyalty/Services/ActivityService.dart';
 import 'package:station_msloyalty/app_launcher_screen.dart';
 import 'package:station_msloyalty/Constants/StyleConstants.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -64,6 +65,19 @@ class _LoginPageState extends State<LoginPage> {
           description:
               'User ${AppConfig.currentUserName} logged in at ${AppConfig.stationName}',
         );
+
+        // Log to user_login_logs for HO Dashboard monitoring
+        try {
+          await Supabase.instance.client.from('user_login_logs').insert({
+            'username': _usernameController.text.trim(),
+            'user_type': 'Station App',
+            'device_info': 'Station Loyalty App (${AppConfig.stationId})',
+            'ip_address': 'Unknown',
+            'created_at': DateTime.now().toUtc().toIso8601String(),
+          });
+        } catch (e) {
+          print("Error writing to user_login_logs: $e");
+        }
 
         if (!mounted) return;
         Navigator.of(context).pushAndRemoveUntil(

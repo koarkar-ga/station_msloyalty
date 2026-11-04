@@ -171,7 +171,7 @@ class _SplashScreenState extends State<SplashScreen> {
   Future<bool> checkApiConnection() async {
     try {
       final response = await http
-          .get(Uri.parse(AppConfig.apiHealthUrl))
+          .get(Uri.parse(AppConfig.apiHealthUrl), headers: AppConfig.headers)
           .timeout(const Duration(seconds: 4));
 
       if (response.statusCode == 200) {

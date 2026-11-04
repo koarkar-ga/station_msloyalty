@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:bot_toast/bot_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -9,8 +10,18 @@ import 'package:station_msloyalty/Constants/StyleConstants.dart';
 import 'package:station_msloyalty/config.dart' as Config;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+class MyHttpOverrides extends HttpOverrides {
+  @override
+  HttpClient createHttpClient(SecurityContext? context) {
+    return super.createHttpClient(context)
+      ..badCertificateCallback =
+          (X509Certificate cert, String host, int port) => true;
+  }
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  HttpOverrides.global = MyHttpOverrides();
   await AppConfig.loadConfig();
   await Supabase.initialize(
     url: Config.supabaseUrl,

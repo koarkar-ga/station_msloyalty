@@ -74,7 +74,7 @@ class _FuelPosScreenState extends State<FuelPosScreen> {
   Future<void> _fetchPumpStatuses() async {
     try {
       final response = await http
-          .get(Uri.parse("${AppConfig.apiUrl}/api/pump-status"))
+          .get(Uri.parse("${AppConfig.apiUrl}/api/pump-status"), headers: AppConfig.headers)
           .timeout(const Duration(seconds: 3));
       if (response.statusCode == 200) {
         final data = json.decode(response.body) as Map<String, dynamic>;
@@ -98,7 +98,7 @@ class _FuelPosScreenState extends State<FuelPosScreen> {
     setState(() => _isLoadingPumpSetup = true);
     try {
       final response = await http
-          .get(Uri.parse("${AppConfig.apiUrl}/api/pump-setup"))
+          .get(Uri.parse("${AppConfig.apiUrl}/api/pump-setup"), headers: AppConfig.headers)
           .timeout(const Duration(seconds: 5));
 
       if (response.statusCode == 200) {
@@ -255,7 +255,7 @@ class _FuelPosScreenState extends State<FuelPosScreen> {
     try {
       final response = await http.post(
         Uri.parse("${AppConfig.apiUrl}/api/authorize-pump"),
-        headers: {"Content-Type": "application/json"},
+        headers: AppConfig.headers,
         body: json.encode({
           "hoseId": _selectedNozzle,
           "presetType": _presetType,
@@ -334,6 +334,7 @@ class _FuelPosScreenState extends State<FuelPosScreen> {
     try {
       final response = await http.get(
         Uri.parse("${AppConfig.apiUrl}/api/sales/lastsale?hoseId=$hoseId&onlyUncleared=true"),
+        headers: AppConfig.headers,
       ).timeout(const Duration(seconds: 5));
 
       BotToast.closeAllLoading();

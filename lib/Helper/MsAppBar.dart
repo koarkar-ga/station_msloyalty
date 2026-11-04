@@ -31,9 +31,9 @@ class MsAppBar extends StatefulWidget implements PreferredSizeWidget {
 }
 
 class _MsAppBarState extends State<MsAppBar> {
-  final String apiHealthUrl = "${AppConfig.apiUrl}/api/health";
-  final String apiUrl = "${AppConfig.apiUrl}/api/sales/recent";
-  final String apiEhoSendCount = "${AppConfig.apiUrl}/api/eho/send-count";
+  String get apiHealthUrl => "${AppConfig.apiUrl}/api/health";
+  String get apiUrl => "${AppConfig.apiUrl}/api/sales/recent";
+  String get apiEhoSendCount => "${AppConfig.apiUrl}/api/eho/send-count";
 
   bool _isApiOnline = false;
   bool _isEhoUpdate = false;
@@ -44,6 +44,8 @@ class _MsAppBarState extends State<MsAppBar> {
   @override
   void initState() {
     super.initState();
+    checkApiConnection();
+    _ehoRemainingToSend();
     _timer = Timer.periodic(const Duration(seconds: 15), (timer) {
       checkApiConnection();
       _ehoRemainingToSend();
@@ -59,8 +61,8 @@ class _MsAppBarState extends State<MsAppBar> {
   Future<bool> checkApiConnection() async {
     try {
       final response = await http
-          .get(Uri.parse(AppConfig.apiHealthUrl))
-          .timeout(const Duration(seconds: 3));
+          .get(Uri.parse(AppConfig.apiHealthUrl), headers: AppConfig.headers)
+          .timeout(const Duration(seconds: 4));
       if (response.statusCode == 200) {
         if (mounted) {
           setState(() {
@@ -90,7 +92,7 @@ class _MsAppBarState extends State<MsAppBar> {
   Future<void> _ehoRemainingToSend() async {
     try {
       final response = await http
-          .get(Uri.parse(apiEhoSendCount))
+          .get(Uri.parse(apiEhoSendCount), headers: AppConfig.headers)
           .timeout(const Duration(seconds: 15));
       final data = json.decode(response.body);
       if (response.statusCode == 200 && mounted) {

@@ -114,8 +114,17 @@ class _SetupScreenState extends State<SetupScreen> {
         throw "Incorrect HO Configuration Password.";
       }
 
-      // 2. Fetch Server Config
-      final config = await supabase
+      // 2. Fetch Server Config (prefer rows where api_url is configured)
+      var config = await supabase
+          .from('auth')
+          .select('db_host, db_user, db_pass, db_name, api_url, db_port')
+          .eq('station_code', 'ALL')
+          .not('api_url', 'is', null)
+          .neq('api_url', '')
+          .limit(1)
+          .maybeSingle();
+
+      config ??= await supabase
           .from('auth')
           .select('db_host, db_user, db_pass, db_name, api_url, db_port')
           .eq('station_code', 'ALL')
@@ -126,6 +135,11 @@ class _SetupScreenState extends State<SetupScreen> {
         throw "HO Configuration not found in Cloud Database.";
       }
 
+      final resolvedApi = (config['api_url'] != null &&
+              config['api_url'].toString().trim().isNotEmpty)
+          ? config['api_url'].toString().trim()
+          : 'http://localhost:3000';
+
       await AppConfig.saveConfig(
         name: "ALL STATION (HO)",
         id: "ALL",
@@ -133,7 +147,7 @@ class _SetupScreenState extends State<SetupScreen> {
         dbUser: config['db_user'] ?? 'sa',
         dbPass: config['db_pass'] ?? '',
         dbName: config['db_name'] ?? 'HO',
-        api: config['api_url'] ?? 'http://localhost:3000',
+        api: resolvedApi,
         dbPort: config['db_port']?.toString() ?? '1433',
         hoConfig: true,
       );
@@ -171,9 +185,18 @@ class _SetupScreenState extends State<SetupScreen> {
         throw "Incorrect HO Configuration Password.";
       }
 
-      // 2. Fetch Server Config
+      // 2. Fetch Server Config (prefer rows where api_url is configured)
       final stationId = _idController.text;
-      final config = await supabase
+      var config = await supabase
+          .from('auth')
+          .select('db_host, db_user, db_pass, db_name, api_url, db_port')
+          .eq('station_code', stationId)
+          .not('api_url', 'is', null)
+          .neq('api_url', '')
+          .limit(1)
+          .maybeSingle();
+
+      config ??= await supabase
           .from('auth')
           .select('db_host, db_user, db_pass, db_name, api_url, db_port')
           .eq('station_code', stationId)
@@ -184,6 +207,11 @@ class _SetupScreenState extends State<SetupScreen> {
         throw "Station Connection parameters not found in Cloud Database. Please configure manually.";
       }
 
+      final resolvedApi = (config['api_url'] != null &&
+              config['api_url'].toString().trim().isNotEmpty)
+          ? config['api_url'].toString().trim()
+          : 'http://localhost:3000';
+
       await AppConfig.saveConfig(
         name: _selectedStationName!,
         id: stationId,
@@ -191,7 +219,7 @@ class _SetupScreenState extends State<SetupScreen> {
         dbUser: config['db_user'] ?? 'sa',
         dbPass: config['db_pass'] ?? '',
         dbName: config['db_name'] ?? stationId,
-        api: config['api_url'] ?? 'http://localhost:3000',
+        api: resolvedApi,
         dbPort: config['db_port']?.toString() ?? '1433',
         hoConfig: false,
       );
@@ -207,7 +235,16 @@ class _SetupScreenState extends State<SetupScreen> {
   Future<void> _fetchPredefinedConfig(String stationId) async {
     setState(() => _isLoadingStations = true);
     try {
-      final config = await supabase
+      var config = await supabase
+          .from('auth')
+          .select('db_host, db_user, db_pass, db_name, api_url, db_port')
+          .eq('station_code', stationId)
+          .not('api_url', 'is', null)
+          .neq('api_url', '')
+          .limit(1)
+          .maybeSingle();
+
+      config ??= await supabase
           .from('auth')
           .select('db_host, db_user, db_pass, db_name, api_url, db_port')
           .eq('station_code', stationId)
@@ -216,12 +253,24 @@ class _SetupScreenState extends State<SetupScreen> {
 
       if (config != null) {
         setState(() {
-          _hostController.text = config['db_host'] ?? _hostController.text;
-          _userController.text = config['db_user'] ?? _userController.text;
-          _passController.text = config['db_pass'] ?? _passController.text;
-          _dbController.text = config['db_name'] ?? _dbController.text;
-          _apiController.text = config['api_url'] ?? _apiController.text;
-          _portController.text = config['db_port']?.toString() ?? _portController.text;
+          if (config!['db_host'] != null && config['db_host'].toString().isNotEmpty) {
+            _hostController.text = config['db_host'];
+          }
+          if (config['db_user'] != null && config['db_user'].toString().isNotEmpty) {
+            _userController.text = config['db_user'];
+          }
+          if (config['db_pass'] != null && config['db_pass'].toString().isNotEmpty) {
+            _passController.text = config['db_pass'];
+          }
+          if (config['db_name'] != null && config['db_name'].toString().isNotEmpty) {
+            _dbController.text = config['db_name'];
+          }
+          if (config['api_url'] != null && config['api_url'].toString().isNotEmpty) {
+            _apiController.text = config['api_url'];
+          }
+          if (config['db_port'] != null && config['db_port'].toString().isNotEmpty) {
+            _portController.text = config['db_port'].toString();
+          }
         });
         
         if (mounted) {

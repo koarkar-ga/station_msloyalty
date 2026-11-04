@@ -749,10 +749,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
       // 2. Fetch connection details from the auth table for this specific station first, 
       // then fall back to 'ALL' for other settings.
-      final stationConfig = await Supabase.instance.client
+      var stationConfig = await Supabase.instance.client
           .from('auth')
           .select('*')
           .eq('station_code', stationId)
+          .not('api_url', 'is', null)
+          .neq('api_url', '')
+          .limit(1)
           .maybeSingle();
 
       if (stationConfig != null) {
@@ -767,6 +770,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
             .from('auth')
             .select('*')
             .eq('station_code', 'ALL')
+            .not('api_url', 'is', null)
+            .neq('api_url', '')
+            .limit(1)
             .maybeSingle();
 
         if (hoConfig != null) {
